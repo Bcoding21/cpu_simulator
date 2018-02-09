@@ -3,6 +3,7 @@
  * Temilola Oloyede
  * Daniel Erhabor
  * David Awogbemila
+ * Brandon Cole
  * cpu.c
  * Implementation of simulated processor.
  */
