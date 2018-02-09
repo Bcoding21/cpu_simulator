@@ -3,6 +3,7 @@
  * Temilola Oloyede
  * Daniel Erhabor
  * David Awogbemila
+ * Brandon Cole
  * memory.c
  * Implementation of the memory.
  */

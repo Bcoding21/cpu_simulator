@@ -3,6 +3,7 @@
  * Temilola Oloyede
  * Daniel Erhabor
  * David Awogbemila
+ * Brandon Cole
  * syscall.c
  * Implementation of the system calls
  */

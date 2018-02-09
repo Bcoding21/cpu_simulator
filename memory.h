@@ -3,6 +3,7 @@
  * Temilola Oloyede
  * Daniel Erhabor
  * David Awogbemila
+ * Brandon Cole
  * memory.h
  * Definitions for the memory.
  */
