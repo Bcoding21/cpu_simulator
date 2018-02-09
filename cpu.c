@@ -1,8 +1,8 @@
 /**
  * Gedare Bloom
  * Temilola Oloyede
+ * Daniel Erhabor
  * cpu.c
- *
  * Implementation of simulated processor.
  */
 

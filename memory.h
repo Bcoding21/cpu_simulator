@@ -1,8 +1,8 @@
 /**
  * Gedare Bloom
  * Temilola Oloyede
+ * Daniel Erhabor
  * memory.h
- *
  * Definitions for the memory.
  */
 
