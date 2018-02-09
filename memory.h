@@ -1,5 +1,6 @@
 /**
  * Gedare Bloom
+ * Temilola Oloyede
  * memory.h
  *
  * Definitions for the memory.

@@ -1,5 +1,6 @@
 /**
  * Gedare Bloom
+ * Temilola Oloyede
  * cpu.c
  *
  * Implementation of simulated processor.

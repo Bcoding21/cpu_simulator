@@ -1,5 +1,6 @@
 /**
  * Gedare Bloom
+ * Temilola Oloyede
  * memory.c
  *
  * Implementation of the memory.

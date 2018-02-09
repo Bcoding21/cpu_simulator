@@ -1,5 +1,6 @@
 /**
  * Gedare Bloom
+ * Temilola Oloyede
  * single-cycle.c
  *
  * Drives the simulation of a single-cycle processor
