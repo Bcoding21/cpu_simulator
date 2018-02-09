@@ -2,6 +2,7 @@
  * Gedare Bloom
  * Temilola Oloyede
  * Daniel Erhabor
+ * David Awogbemila
  * memory.c
  * Implementation of the memory.
  */
