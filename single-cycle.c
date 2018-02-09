@@ -2,6 +2,7 @@
  * Gedare Bloom
  * Temilola Oloyede
  * Daniel Erhabor
+ * David Awogbemila
  * single-cycle.c
  * Drives the simulation of a single-cycle processor
  */

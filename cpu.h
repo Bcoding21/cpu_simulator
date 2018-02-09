@@ -2,6 +2,7 @@
  * Gedare Bloom
  * Temilola Oloyede
  * Daniel Erhabor 
+ * David Awogbemila
  * cpu.h
  * Definitions for the processor.
  */
