@@ -1,8 +1,8 @@
 /**
  * Gedare Bloom
  * Temilola Oloyede
+ * Daniel Erhabor 
  * cpu.h
- *
  * Definitions for the processor.
  */
 

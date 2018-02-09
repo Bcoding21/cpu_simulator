@@ -1,8 +1,8 @@
 /**
  * Gedare Bloom
  * Temilola Oloyede
+ * Daniel Erhabor
  * syscall.h
- *
  * Definitions for the system calls
  */
 
