@@ -3,6 +3,7 @@
  * Temilola Oloyede
  * Daniel Erhabor
  * David Awogbemila
+ * Brandon Cole
  * syscall.h
  * Definitions for the system calls
  */
