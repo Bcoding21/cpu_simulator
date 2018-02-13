@@ -26,6 +26,7 @@ int main( int argc, char *argv[] )
 	struct EX_MEM_buffer ex_mem;
 	struct MEM_WB_buffer mem_wb;
 	int i;
+	cpu_ctx.PC = 0x00400000;
 
 	/* Initialize registers and memory to 0 */
 	cpu_ctx.PC = 0;
@@ -56,10 +57,13 @@ int main( int argc, char *argv[] )
 	}
 	fclose(f);
 
+	
+
 	while(1) {
 #if defined(DEBUG)
 		printf("FETCH from PC=%x\n", cpu_ctx.PC);
 #endif
+	
 		fetch( &if_id );
 		decode( &if_id, &id_ex );
 		execute( &id_ex, &ex_mem );
