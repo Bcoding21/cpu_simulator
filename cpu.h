@@ -94,8 +94,7 @@ struct REG_FILE_input {
 
 struct REG_FILE_output {
 	uint32_t read_data_1, read_data_2;
-	short alu_control;
-};
+}
 
 // ALU I/O
 struct ALU_INPUT {

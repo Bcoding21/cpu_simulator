@@ -30,11 +30,11 @@ int decode( struct IF_ID_buffer *in, struct ID_EX_buffer *out )
 	setMultiplexors(opcode); // set all multiplexor  states
 
 	// set inputs
-	registerInputs->read_reg_1 = (in->instruction >> 20) & 0x1F; // get bits 25:31
-	registerInputs->read_reg_2 = (in->instruction >> 15) & 0x1F; // get bits 20:16
-	registerInputs->write_reg = (in->instruction >> 10) & 0x1F; // gets bits 15:11
+	registerInputs->read_reg_1 = (in->instruction >> 20) & 0x1F; // get bits 25:31(rs)
+	registerInputs->read_reg_2 = (in->instruction >> 15) & 0x1F; // get bits 20:16(rt)
+	registerInputs->write_reg = (in->instruction >> 10) & 0x1F; // gets bits 15:11(rd)
 	registerInputs->reg_write = cpu_ctx.CNTRL.reg_write; // set register control signal
-	uint32_t sign_extended_val = in->instruction & 0x7FFF;
+	uint32_t sign_extended_val = in->instruction & 0x7FFF; // 15:0 // address
 
 	struct REG_FILE_output* registerOutputs = (struct REG_FILE_input*) malloc(sizeof(struct REG_FILE_input)); // holds outputs
 
@@ -43,7 +43,7 @@ int decode( struct IF_ID_buffer *in, struct ID_EX_buffer *out )
     // set outputs
 	out->read_data_1 = registerOutputs->read_data_1;
 	out->read_data_2 = (cpu_ctx.aluMUX.value) ? sign_extended_val : registerOutputs->read_data_2; // if 1 then set to 16 bit sign extended. else set to output of read reg 2
-    out->alu_control = registerOutputs->alu_control;
+    out->alu_control = in->instruction & 0x1F; // bits 5:0 (funct)
 	return 0;
 }
 
