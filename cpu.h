@@ -13,34 +13,29 @@
 
 
 struct Control {
-	bool mem_to_reg;
 	bool reg_write;
 	bool mem_read;
 	bool mem_write;
 	bool branch;
-	short alu_op;
 };
 
-struct RegDst_MUX {
-	bool value;
+enum InstructionType{
+    LOAD_WORD, STORE_WORD, BRANCH, R_TYPE
 };
 
-struct ALUSrc_MUX {
-	bool value;
-};
-
-struct MemtoReg_MUX {
-	bool value;
+enum InstructionFormat{
+    R_FORMAT, I_FORMAT, J_FORMAT, NO_OP
 };
 
 struct cpu_context {
 	uint32_t PC;
 	uint32_t GPR[32];
-	short ALU_CONTORL;
 	struct Control CNTRL;
-	struct RegDst_MUX regMUX;
-	struct ALUSrc_MUX aluMUX;
-	struct MemtoReg_MUX memToRegMUX;
+	bool RegDst_MUX;
+	bool ALUSrc_MUX;
+	bool MemtoReg_MUX;
+    enum InstructionFormat instructionFormat;
+    enum InstructionType instructionType;
 };
 
 extern struct cpu_context cpu_ctx;
@@ -52,14 +47,13 @@ struct IF_ID_buffer {
 
 
 struct ID_EX_buffer {
-	bool alu_control;
+	short funct, opcode;
 	uint32_t read_data_1, read_data_2;
-
 };
 
 struct EX_MEM_buffer {
 	uint32_t alu_result;
-	uint32_t branch_result;
+	bool branch_result;
 	uint32_t write_data;
 
 };
@@ -76,17 +70,8 @@ int execute( struct ID_EX_buffer *in, struct EX_MEM_buffer *out );
 int memory( struct EX_MEM_buffer *in, struct MEM_WB_buffer *out );
 int writeback( struct MEM_WB_buffer *in );
 
-// Major Components
-int instructionMemory(uint32_t address, struct IF_ID_buffer *out);
-int registerFile(struct REG_FILE_input*, struct REG_FILE_output*);
-int alu(struct ALU_INPUT* in, struct ALU_OUTPUT* out);
 
-// Other Helper
-int setControl(uint32_t);
-void setMultiplexors(short);
-
-
-// Register File
+// Register File I/O
 struct REG_FILE_input {
 	uint32_t read_reg_1, read_reg_2, write_reg, write_data;
 	bool reg_write;
@@ -94,12 +79,12 @@ struct REG_FILE_input {
 
 struct REG_FILE_output {
 	uint32_t read_data_1, read_data_2;
-}
+};
 
 // ALU I/O
 struct ALU_INPUT {
 	uint32_t input_1, input_2;
-	short alu_control;
+	short funct, opcode;
 };
 
 struct ALU_OUTPUT {
@@ -107,10 +92,19 @@ struct ALU_OUTPUT {
 	bool branch_result;
 };
 
+
 // Data Memory
 struct MEM_INPUT {
 	uint32_t address, write_data;
 	bool data_memory;
 };
 
+
+// Helpers
+int instructionMemory(uint32_t address, struct IF_ID_buffer *out);
+int registerFile(struct REG_FILE_input*, struct REG_FILE_output*);
+int alu(struct ALU_INPUT* in, struct ALU_OUTPUT* out);
+int setControlState(short);
+void setInstructionFormat(short);
+void setMultiplexors();
 
