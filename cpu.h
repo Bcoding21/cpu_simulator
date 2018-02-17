@@ -20,6 +20,8 @@ struct Control {
 	bool mem_to_reg;
 	uint32_t alu_op;
 };
+uint32_t MULTIPLEXOR(bool selector, uint32_t HIGH_INPUT, uint32_t LOW_INPUT);
+
 
 enum InstructionType{
     LOAD_WORD, STORE_WORD, BRANCH, R_TYPE

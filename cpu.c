@@ -35,7 +35,10 @@ int decode( struct IF_ID_buffer *in, struct ID_EX_buffer *out )
     struct REG_FILE_input* registerInputs = (struct REG_FILE_input*) malloc(sizeof(struct REG_FILE_input)); // holds inputs
 	registerInputs->read_reg_1 = (in->instruction >> 21) & 0x1F; // get bits 25:21 (rs)
 	registerInputs->read_reg_2 = (in->instruction >> 16) & 0x1F; // get bits 20:16(rt)
-	registerInputs->write_reg = (in->instruction >> 11) & 0x1F; // gets bits 15:11(rd)
+
+	// Write register will depend on the RegDst multiplexor      gets bits 15:11(rd)                get bits 20:16(rt)
+	registerInputs->write_reg = MULTIPLEXOR(cpu_ctx.RegDst_MUX, (in->instruction >> 11) & 0x1F, registerInputs->read_reg_2);
+//	registerInputs->write_reg = (in->instruction >> 11) & 0x1F; // gets bits 15:11(rd)
 	uint32_t sign_extended_val = in->instruction & 0x7FFF; // 15:0 // address
 	registerInputs->reg_write = cpu_ctx.CNTRL.reg_write; // set register control signal
 
@@ -270,5 +273,18 @@ void setMultiplexors() { // sets multiplexor states
 		cpu_ctx.MemtoReg_MUX = false;
 	}
 
+}
 
+uint32_t MULTIPLEXOR(bool selector, uint32_t HIGH_INPUT, uint32_t LOW_INPUT){
+    // Function takes in 2 unsigned 32 bit value, if the selector is True we return the HIGH_INPUT
+    // else we return the LOW_INPUT because the selector is definitely false.
+    uint32_t result_val;
+    if (selector){                  //
+        result_val = HIGH_INPUT;
+    }
+    else{
+        result_val = LOW_INPUT;
+    }
+
+    return result_val;
 }
