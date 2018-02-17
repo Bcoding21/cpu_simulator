@@ -17,6 +17,8 @@ struct Control {
 	bool mem_read;
 	bool mem_write;
 	bool branch;
+	bool mem_to_reg;
+	uint32_t alu_op;
 };
 
 enum InstructionType{
@@ -112,8 +114,6 @@ int alu(struct ALU_INPUT* in, struct ALU_OUTPUT* out);
 
 // Other Helper
 int setControl(uint32_t);
-
-
 
 // Helpers
 int instructionMemory(uint32_t address, struct IF_ID_buffer *out);

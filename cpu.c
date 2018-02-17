@@ -16,7 +16,6 @@ int instructionMemory(uint32_t address, struct IF_ID_buffer *out);
 int registerFile(struct REG_FILE_input* input, struct REG_FILE_output* output);
 int alu(struct ALU_INPUT* alu_input, struct ALU_OUTPUT* out);
 int setControl(uint32_t opcode);
-void setMultiplexors(short opcode);
 
 struct cpu_context cpu_ctx;
 
@@ -34,7 +33,7 @@ int decode( struct IF_ID_buffer *in, struct ID_EX_buffer *out )
 
 	setControl(opcode); // set outputs for control units
 	//setALUControl(opcode); // set alu control output
-	setMultiplexors(opcode); // set all multiplexor  states
+	setMultiplexors(); // set all multiplexor  states
 
     struct REG_FILE_input* registerInputs = (struct REG_FILE_input*) malloc(sizeof(struct REG_FILE_input)); // holds inputs
 	// set inputs
