@@ -140,6 +140,12 @@ int alu(struct ALU_INPUT* alu_input, struct ALU_OUTPUT* out){
 			}
 
 			else if (alu_input->funct == 0x03){ // sra
+                int32_t result = alu_input->input_1;        // Make it signed to shift right arithmetic
+                result = alu_input->input_1 >> alu_input->input_2;  // Shift right keeping the sign bit
+                out->alu_result = result;  // Assign it back to out->alu_result to be consistent with its return value
+			}
+			else if (alu_input->funct == 0x25){
+                out->alu_result = alu_input->input_1 | alu_input->input_2; // OP1 or OP2
 			}
 
 			break;
@@ -263,5 +269,6 @@ void setMultiplexors() { // sets multiplexor states
 		cpu_ctx.ALUSrc_MUX = false;
 		cpu_ctx.MemtoReg_MUX = false;
 	}
+
 
 }
