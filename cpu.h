@@ -17,7 +17,11 @@ struct Control {
 	bool mem_read;
 	bool mem_write;
 	bool branch;
+	bool mem_to_reg;
+	uint32_t alu_op;
 };
+uint32_t MULTIPLEXOR(bool selector, uint32_t HIGH_INPUT, uint32_t LOW_INPUT);
+
 
 enum InstructionType{
     LOAD_WORD, STORE_WORD, BRANCH, R_TYPE
@@ -62,7 +66,6 @@ struct MEM_WB_buffer {
 	uint32_t write_data;
 };
 
-
 // Stages
 int fetch( struct IF_ID_buffer *out);
 int decode( struct IF_ID_buffer *in, struct ID_EX_buffer *out );
@@ -99,6 +102,20 @@ struct MEM_INPUT {
 	bool data_memory;
 };
 
+// Stages
+int fetch( struct IF_ID_buffer *out);
+int decode( struct IF_ID_buffer *in, struct ID_EX_buffer *out );
+int execute( struct ID_EX_buffer *in, struct EX_MEM_buffer *out );
+int memory( struct EX_MEM_buffer *in, struct MEM_WB_buffer *out );
+int writeback( struct MEM_WB_buffer *in );
+
+// Major Components
+int instructionMemory(uint32_t address, struct IF_ID_buffer *out);
+int registerFile(struct REG_FILE_input *in, struct REG_FILE_output *out);
+int alu(struct ALU_INPUT* in, struct ALU_OUTPUT* out);
+
+// Other Helper
+int setControl(uint32_t);
 
 // Helpers
 int instructionMemory(uint32_t address, struct IF_ID_buffer *out);
