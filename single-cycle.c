@@ -31,7 +31,7 @@ int main( int argc, char *argv[] )
 	/* Initialize registers and memory to 0 */
 	// cpu_ctx.PC = 0;
 	for ( i = 0; i < 32; i++ ) {
-		cpu_ctx.GPR[i] = 0;
+		cpu_ctx.GPR[i] = i;
 	}
 
 	for ( i = 0; i < 1024; i++ ) {
@@ -46,10 +46,10 @@ int main( int argc, char *argv[] )
 		printf("File not found");
 	}
 	assert (f);
-	for ( i = 0; i < 1024; i++ ) {
-		// fread(&data_memory[i], sizeof(uint32_t), 1, f);
+	for ( i = 0; i < 0; i++ ) {
+		fread(&data_memory[i], sizeof(uint32_t), 1, f);
 #if defined(DEBUG)
-		// printf("%u\n", data_memory[i]);
+		printf("%u\n", data_memory[i]);
 #endif
 	}
 	for ( i = 0; i < 36; i++ ) {
@@ -61,12 +61,13 @@ int main( int argc, char *argv[] )
 	fclose(f);
 	int count = 0;
 
-	while(count < 36) {
+	while(count < 7) {
 // #if defined(DEBUG)
 // 		printf("FETCH from PC=%x\n", cpu_ctx.PC);
 // #endif
 		fetch( if_id );
-		// decode( &if_id, &id_ex );
+		cpu_ctx.PC += 1;
+		decode( if_id, &id_ex );
 		// execute( &id_ex, &ex_mem );
 		// memory( &ex_mem, &mem_wb );
 		// writeback( &mem_wb );

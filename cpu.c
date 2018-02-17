@@ -15,7 +15,6 @@
 int instructionMemory(uint32_t address, struct IF_ID_buffer *out);
 int registerFile(struct REG_FILE_input* input, struct REG_FILE_output* output);
 int alu(struct ALU_INPUT* alu_input, struct ALU_OUTPUT* out);
-int setControl(uint32_t opcode);
 
 struct cpu_context cpu_ctx;
 
@@ -27,31 +26,33 @@ int fetch(struct IF_ID_buffer *out )
 
 int decode( struct IF_ID_buffer *in, struct ID_EX_buffer *out )
 {
-	short opcode = in->instruction >> 25; // gets bits 31:26
+	short opcode = in->instruction >> 26; // gets bits 31:26
 
 	setControlState(opcode); // set outputs for control units
-
-	setControl(opcode); // set outputs for control units
-	//setALUControl(opcode); // set alu control output
 	setMultiplexors(); // set all multiplexor  states
 
-    struct REG_FILE_input* registerInputs = (struct REG_FILE_input*) malloc(sizeof(struct REG_FILE_input)); // holds inputs
 	// set inputs
-	registerInputs->read_reg_1 = (in->instruction >> 20) & 0x1F; // get bits 25:21 (rs)
-	registerInputs->read_reg_2 = (in->instruction >> 15) & 0x1F; // get bits 20:16(rt)
-	registerInputs->write_reg = (in->instruction >> 10) & 0x1F; // gets bits 15:11(rd)
+    struct REG_FILE_input* registerInputs = (struct REG_FILE_input*) malloc(sizeof(struct REG_FILE_input)); // holds inputs
+	registerInputs->read_reg_1 = (in->instruction >> 21) & 0x1F; // get bits 25:21 (rs)
+	registerInputs->read_reg_2 = (in->instruction >> 16) & 0x1F; // get bits 20:16(rt)
+	registerInputs->write_reg = (in->instruction >> 11) & 0x1F; // gets bits 15:11(rd)
 	uint32_t sign_extended_val = in->instruction & 0x7FFF; // 15:0 // address
 	registerInputs->reg_write = cpu_ctx.CNTRL.reg_write; // set register control signal
 
-	// struct REG_FILE_output* registerOutputs = (struct REG_FILE_input*) malloc(sizeof(struct REG_FILE_input)); // holds outputs
+	struct REG_FILE_output* registerOutputs = (struct REG_FILE_output*) malloc(sizeof(struct REG_FILE_output)); // holds outputs
 
-	// registerFile(registerInputs, registerOutputs);
+	registerFile(registerInputs, registerOutputs);
 
 
-	// out->read_data_1 = registerOutputs->read_data_1;
-	// out->read_data_2 = (cpu_ctx.ALUSrc_MUX) ? sign_extended_val : registerOutputs->read_data_2; // if 1 then set to 16 bit sign extended. else set to output of read reg 2
- //    out->funct = in->instruction & 0x3F; // bits 5:0 funct
-	// out->opcode = opcode;
+	out->read_data_1 = registerOutputs->read_data_1;
+	out->read_data_2 = (cpu_ctx.ALUSrc_MUX) ? sign_extended_val : registerOutputs->read_data_2; // if 1 then set to 16 bit sign extended. else set to output of read reg 2
+ 	out->funct = in->instruction & 0x3F; // bits 5:0 funct
+	out->opcode = opcode;
+
+	printf("opcode: %d\n", out->opcode);
+	printf("read_data_1: %d\n", out->read_data_1);
+	printf("read_data_2: %d\n", out->read_data_2);
+	printf("funct: %d\n", out->funct);
 	return 0;
 }
 
@@ -88,7 +89,7 @@ int writeback( struct MEM_WB_buffer *in )
 
 int instructionMemory(uint32_t address, struct IF_ID_buffer *out) {
 	out->instruction = instruction_memory[address - 0x400000];
-	printf("Instruction got: %d\n", out->instruction);
+	// printf("Instruction got: %d\n", out->instruction);
 	return 0;
 }
 
@@ -182,17 +183,6 @@ int alu(struct ALU_INPUT* alu_input, struct ALU_OUTPUT* out){
 			break;
 	}
     return 0;
-}
-
-int setControl(uint32_t opcode) { // sets control signal outputs
-	if (opcode == 0) { // R-Format
-		cpu_ctx.CNTRL.mem_to_reg = false;
-		cpu_ctx.CNTRL.reg_write = true;
-		cpu_ctx.CNTRL.mem_read = false;
-		cpu_ctx.CNTRL.mem_write = false;
-		cpu_ctx.CNTRL.branch = false;
-		cpu_ctx.CNTRL.alu_op = 2;
-	}
 }
 
 int setControlState(short opcode) { // sets control signal outputs
