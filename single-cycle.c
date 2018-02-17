@@ -42,6 +42,9 @@ int main( int argc, char *argv[] )
 
 	/* Read memory from the input file */
 	f = fopen(argv[1], "r");
+	if (!f){
+		printf("File not found");
+	}
 	assert (f);
 	for ( i = 0; i < 1024; i++ ) {
 		// fread(&data_memory[i], sizeof(uint32_t), 1, f);
