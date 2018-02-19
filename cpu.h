@@ -20,6 +20,7 @@ struct Control {
 	bool mem_to_reg;
 	uint32_t alu_op;
 };
+
 uint32_t MULTIPLEXOR(bool selector, uint32_t HIGH_INPUT, uint32_t LOW_INPUT);
 
 
@@ -51,8 +52,14 @@ struct IF_ID_buffer {
 
 
 struct ID_EX_buffer {
+    bool reg_write;
+    bool mem_read;
+    bool mem_write;
+    bool branch;
+    bool mem_to_reg;
+    uint32_t alu_op;
 	short funct, opcode;
-	uint32_t read_data_1, read_data_2;
+	uint32_t read_data_1, read_data_2, immediate;
 };
 
 struct EX_MEM_buffer {

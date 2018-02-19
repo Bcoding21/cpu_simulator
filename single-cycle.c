@@ -40,8 +40,9 @@ int main( int argc, char *argv[] )
 		stack_memory[i] = 0;
 	}
 
+    const char* file = "example-text.txt";
 	/* Read memory from the input file */
-	f = fopen(argv[1], "r");
+	f = fopen(file, "r");
 	if (!f){
 		printf("File not found");
 	}
