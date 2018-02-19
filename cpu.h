@@ -39,8 +39,6 @@ struct cpu_context {
 	uint32_t PC;
 	uint32_t GPR[32];
 	struct Control CNTRL;
-    enum InstructionFormat instructionFormat;
-    enum InstructionType instructionType;
 };
 
 extern struct cpu_context cpu_ctx;
@@ -75,14 +73,13 @@ struct EX_MEM_buffer {
 	bool mem_to_reg;
 	bool jump;
 	bool jump_register;
-	uint32_t branch_target;
 	bool branch_result;
+	uint32_t branch_target;
 	uint32_t alu_result;
-	uint32_t write_data;
 	uint32_t write_reg_index;
 	uint32_t pc_plus_4;
 	uint32_t jump_target_address;
-
+	uint32_t read_data_2;
 };
 
 struct MEM_WB_buffer {

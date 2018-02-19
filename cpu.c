@@ -95,7 +95,7 @@ int execute( struct ID_EX_buffer *in, struct EX_MEM_buffer *out )
     // pass alu results
     out->alu_result = alu_output->alu_result;
     out->branch_result = alu_output->branch_result;
-
+    out->read_data_2 = in->read_data_2;
     // pass control signals to next buffer
     out->branch = in->branch;
     out->mem_read = in->mem_read;
@@ -114,7 +114,7 @@ int memory( struct EX_MEM_buffer *in, struct MEM_WB_buffer *out )
 {
 	uint32_t write_address = in->alu_result;
 	bool branch = in->branch_result;
-	uint32_t write_data = in->write_data;
+	uint32_t write_data = in->read_data_2;
 	if (in->mem_write) {
 		data_memory[write_address - 0x10000000] = write_data;
 	}
@@ -153,98 +153,23 @@ int instructionMemory(uint32_t address, struct IF_ID_buffer *out) {
 	return 0;
 }
 
-
-
 int alu(struct ALU_INPUT* alu_input, struct ALU_OUTPUT* out){
-
-	out->branch_result = 0;
-	switch (cpu_ctx.instructionFormat){
-
-		case R_FORMAT:
-
-			if (alu_input->funct == 0x20){ // add
-				out->alu_result = alu_input->input_1 + alu_input->input_2;
-			}
-
-			else if(alu_input->funct == 0x24){ // and
-				out->alu_result = alu_input->input_1 & alu_input->input_2;
-			}
-
-			else if(alu_input->funct == 0x27){ // nor
-				out->alu_result = ~(alu_input->input_1 | alu_input->input_2);
-			}
-
-			else if(alu_input->funct == 0x26){ // xor
-				out->alu_result = alu_input->input_1 ^ alu_input->input_2;
-			}
-
-			else if(alu_input->funct == 0x2A){ // slt
-				int result = alu_input->input_1 - alu_input->input_2;
-				out->alu_result = (result < 0 ) ? 1 : 0;
-			}
-
-			else if(alu_input->funct == 0x00){ // sll
-				out->alu_result = alu_input->input_1 << alu_input->input_2;
-			}
-
-			else if(alu_input->funct == 0x02){ // srl
-				out->alu_result = alu_input->input_1 >> alu_input->input_2;
-			}
-
-			else if(alu_input->funct == 0x22){ // sub
-				out->alu_result = alu_input->input_1 - alu_input->input_2;
-			}
-
-			else if (alu_input->funct == 0x03){ // sra
-                int32_t result = alu_input->input_1;        // Make it signed to shift right arithmetic
-                result = alu_input->input_1 >> alu_input->input_2;  // Shift right keeping the sign bit
-                out->alu_result = result;  // Assign it back to out->alu_result to be consistent with its return value
-			}
-			else if (alu_input->funct == 0x25){
-                out->alu_result = alu_input->input_1 | alu_input->input_2; // OP1 or OP2
-			}
-
-			break;
-
-		case I_FORMAT:
-			if (alu_input->opcode == 0x08){ // addi
-				out->alu_result = alu_input->input_1 + alu_input->input_2;
-			}
-
-			else if (alu_input->opcode == 0x04){ // beq
-				out->branch_result = (alu_input->input_1 == alu_input->input_2) ? true : false;
-			}
-
-			else if (alu_input->opcode == 0x05){ // bne
-				out->branch_result = (alu_input->input_1 != alu_input->input_2) ? true : false;
-			}
-
-			else if (alu_input->opcode == 0x0F){ // lui
-				out->alu_result = alu_input->input_2;
-			}
-
-			else if (alu_input->opcode == 0x23){ // lw
-				out->alu_result = alu_input->input_1 + alu_input->input_2;
-			}
-
-			else if (alu_input->opcode == 0x0D){ // ori
-				out->alu_result = alu_input->input_1 ^ alu_input->input_2;
-			}
-
-			else if (alu_input->opcode == 0x0A){ // slti
-				out->alu_result = alu_input->input_1 << alu_input->input_2;
-			}
-
-			else if (alu_input->opcode == 0x2B){ // sw
-				out->alu_result = alu_input->input_1 + alu_input->input_2;
-			}
-
-			else if (alu_input->opcode == 0x0E){ // xori
-				out->alu_result = alu_input->input_1 ^ alu_input->input_2;
-			}
-			break;
+	if (alu_input->opcode == 0x0) { // R-format and syscall
+		// add instructions:
+		if (alu_input->funct == 0x20) { out->alu_result = alu_input->input_1 + alu_input->input_2; }				//add
+		else if(alu_input->funct == 0x24)  { out->alu_result = alu_input->input_1 & alu_input->input_2; }			//and
+		else if(alu_input->funct == 0x27)  { out->alu_result = ~(alu_input->input_1 | alu_input->input_2); }		//nor
+		else if(alu_input->funct == 0x25)  { out->alu_result = alu_input->input_1 | alu_input->input_2; }			//or
+		else if(alu_input->funct == 0x2A)  { out->alu_result = (alu_input->input_1 < alu_input->input_2) ? 1 : 0; }	//slt
 	}
-    return 0;
+	// Jal 
+	else if(alu_input->opcode == 0x2 || alu_input->opcode == 0x3 ) {
+		// No need to do anything.
+	}
+	// I format instructions.
+	else {
+
+	}
 }
 
 int setControlSignals(short opcode, short funct) { // sets control signal outputs
