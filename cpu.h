@@ -18,6 +18,7 @@ struct Control {
 	bool mem_write;
 	bool branch;
 	bool mem_to_reg;
+    bool alu_source;
 	uint32_t alu_op;
 };
 
@@ -57,7 +58,8 @@ struct ID_EX_buffer {
     bool mem_write;
     bool branch;
     bool mem_to_reg;
-    uint32_t alu_op;
+    bool alu_source;
+    uint32_t alu_op, pc_plus_4;
 	short funct, opcode;
 	uint32_t read_data_1, read_data_2, immediate;
 };
@@ -103,7 +105,7 @@ struct REG_FILE_output {
 
 // ALU I/O
 struct ALU_INPUT {
-	uint32_t input_1, input_2;
+	uint32_t input_1, input_2, immediate;
 	short funct, opcode;
 };
 
