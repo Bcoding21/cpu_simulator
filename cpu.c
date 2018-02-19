@@ -68,20 +68,36 @@ int execute( struct ID_EX_buffer *in, struct EX_MEM_buffer *out )
     alu_input->input_2 = in->read_data_2;
 	alu_input->funct = in->funct;
 	alu_input->opcode = in->opcode;
-
+    in->
     struct ALU_OUTPUT* alu_output = (struct ALU_OUTPUT*) malloc(sizeof(struct ALU_OUTPUT)); // hold outputs
 
     alu(alu_input, alu_output);
 
-    // set outputs
+    // pass alu results
     out->alu_result = alu_output->alu_result;
     out->branch_result = alu_output->branch_result;
+
+    // pass signals
+    out->branch = in->branch;
+    out->mem_read = in->mem_read;
+    out->reg_write = in->reg_write;
+    out->mem_write = in->mem_write;
 	return 0;
 }
 
 int memory( struct EX_MEM_buffer *in, struct MEM_WB_buffer *out )
 {
-// made change
+	uint32_t write_address = in->alu_result;
+	bool branch = in->branch_result;
+	uint32_t write_data = in->write_data;
+	if (in->mem_write) {
+		data_memory[write_address - 0x10000000] = write_data;
+	}
+	if (in->mem_read) {
+		out->mem_write_data = data_memory[write_address - 0x10000000];
+	}
+	out->alu_result_data = write_data;
+	out->write_reg_index = in->write_reg_index;
 	return 0;
 }
 
