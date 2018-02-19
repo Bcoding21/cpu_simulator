@@ -29,7 +29,6 @@ int main( int argc, char *argv[] )
 	cpu_ctx.PC = 0x00400000;
 
 	/* Initialize registers and memory to 0 */
-	// cpu_ctx.PC = 0;
 	for ( i = 0; i < 32; i++ ) {
 		cpu_ctx.GPR[i] = i;
 	}
@@ -40,7 +39,8 @@ int main( int argc, char *argv[] )
 		stack_memory[i] = 0;
 	}
 
-    const char* file = "example-text.txt";
+    //const char* file = "example-text.txt";
+    const char* file = argv[1];
 	/* Read memory from the input file */
 	f = fopen(file, "r");
 	if (!f){
@@ -62,17 +62,24 @@ int main( int argc, char *argv[] )
 	fclose(f);
 	int count = 0;
 
-	while(count < 7) {
+	while(count < 2) {
 // #if defined(DEBUG)
 // 		printf("FETCH from PC=%x\n", cpu_ctx.PC);
 // #endif
+		printf("Start: \n");
+		printf("GPR[8]: %d\n", cpu_ctx.GPR[8]);
+		printf("GPR[9]: %d\n", cpu_ctx.GPR[9]);
 		fetch( if_id );
-		cpu_ctx.PC += 1;
 		decode( if_id, &id_ex );
-		// execute( &id_ex, &ex_mem );
-		// memory( &ex_mem, &mem_wb );
-		// writeback( &mem_wb );
-		if ( cpu_ctx.PC == 0 ) break;
+		execute( &id_ex, &ex_mem );
+		memory( &ex_mem, &mem_wb );
+		writeback( &mem_wb );
+		printf("End: \n");
+		printf("GPR[8]: %d\n", cpu_ctx.GPR[8]);
+		printf("GPR[9]: %d\n", cpu_ctx.GPR[9]);
+		if ( cpu_ctx.PC == 0 ) {
+			break;
+		}
 		count++;
 	}
 

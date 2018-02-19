@@ -21,6 +21,7 @@ struct cpu_context cpu_ctx;
 int fetch(struct IF_ID_buffer *out )
 {
 	instructionMemory(cpu_ctx.PC, out);
+	out->next_pc = cpu_ctx.PC + 1;
 	return 0;
 }
 
@@ -90,6 +91,8 @@ int execute( struct ID_EX_buffer *in, struct EX_MEM_buffer *out )
     out->mem_read = in->mem_read;
     out->reg_write = in->reg_write;
     out->mem_write = in->mem_write;
+    out->mem_to_reg = in->mem_to_reg;
+    out->pc_plus_4 = in->pc_plus_4;
     out->branch_target = (in->immediate << 2) + in->pc_plus_4;
 	return 0;
 }
@@ -103,11 +106,21 @@ int memory( struct EX_MEM_buffer *in, struct MEM_WB_buffer *out )
 		data_memory[write_address - 0x10000000] = write_data;
 	}
 
+	//fake implementation of PCSrc signal and MUX
+	if (in->branch && in->branch_result) {
+		cpu_ctx.PC = in->branch_target;
+		printf("used branch!\n");
+	} else {
+		cpu_ctx.PC = in->pc_plus_4;
+		printf("used not branch!\n");
+	}
+
 	//	pass necessary information to MEM/WB buffer	
 	out->reg_write = in->reg_write;
 	if (in->mem_read) {
 		out->mem_write_data = data_memory[write_address - 0x10000000];
 	}
+	out->mem_to_reg = in->mem_to_reg;
 	out->alu_result = write_data;
 	out->write_reg_index = in->write_reg_index;
 	return 0;
@@ -115,8 +128,12 @@ int memory( struct EX_MEM_buffer *in, struct MEM_WB_buffer *out )
 
 int writeback( struct MEM_WB_buffer *in )
 {
+	printf("write back is called\n");
 	if(in->reg_write) {
-		cpu_ctx.PC[in->write_reg_index] = (in->reg_write) ? in->mem_write : in->alu_result;
+		uint32_t temp = cpu_ctx.GPR[in->write_reg_index];
+		printf("write_reg_index %d", in->write_reg_index);
+		cpu_ctx.GPR[in->write_reg_index] = (in->mem_to_reg) ? in->mem_write_data : in->alu_result;
+		printf("value being changed from %d to %d\n", temp, cpu_ctx.GPR[in->write_reg_index]);
 	}
 	return 0;
 }
@@ -237,18 +254,21 @@ int setControlState(short opcode) { // sets control signal outputs
 			cpu_ctx.CNTRL.mem_read = false;
 			cpu_ctx.CNTRL.mem_write = false;
 			cpu_ctx.CNTRL.branch = false;
+			break;
 
 		case LOAD_WORD:
 			cpu_ctx.CNTRL.reg_write = true;
 			cpu_ctx.CNTRL.mem_read = true;
 			cpu_ctx.CNTRL.mem_write = false;
 			cpu_ctx.CNTRL.branch = false;
+			break;
 
 		case STORE_WORD:
 			cpu_ctx.CNTRL.reg_write = false;
 			cpu_ctx.CNTRL.mem_read = false;
 			cpu_ctx.CNTRL.mem_write = true;
 			cpu_ctx.CNTRL.branch = false;
+			break;
 
 		case BRANCH:
 			cpu_ctx.CNTRL.reg_write = false;
