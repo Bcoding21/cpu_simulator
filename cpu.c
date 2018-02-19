@@ -28,33 +28,37 @@ int fetch(struct IF_ID_buffer *out )
 int decode( struct IF_ID_buffer *in, struct ID_EX_buffer *out )
 {
 	short opcode = in->instruction >> 26; // gets bits 31:26
+	short funct = in->instruction & 0x3F // gets bits 5:0
 
-	setControlState(opcode); // set outputs for control units
-	setMultiplexors(); // set all multiplexor  states
+	setControlSignals(opcode, funct); // set the control signals
 
-	// set inputs
-    struct REG_FILE_input* registerInputs = (struct REG_FILE_input*) malloc(sizeof(struct REG_FILE_input)); // holds inputs
-	registerInputs->read_reg_1 = (in->instruction >> 21) & 0x1F; // get bits 25:21 (rs)
-	registerInputs->read_reg_2 = (in->instruction >> 16) & 0x1F; // get bits 20:16(rt)
 
-	// Write register will depend on the RegDst multiplexor      gets bits 15:11(rd)                get bits 20:16(rt)
-	registerInputs->write_reg = MULTIPLEXOR(cpu_ctx.RegDst_MUX, (in->instruction >> 11) & 0x1F, registerInputs->read_reg_2);
-//	registerInputs->write_reg = (in->instruction >> 11) & 0x1F; // gets bits 15:11(rd)
-	registerInputs->reg_write = cpu_ctx.CNTRL.reg_write; // set register control signal
 
-	struct REG_FILE_output* registerOutputs = (struct REG_FILE_output*) malloc(sizeof(struct REG_FILE_output)); // holds outputs
+    uint32_t RS_index = (in->instruction >> 21) & 0x1F; // get bits 25:21 (rs)
+    uint32_t RT_index = (in->instruction >> 16) & 0x1F; // get bits 20:16(rt)
 
-	registerFile(registerInputs, registerOutputs);
+    uint32_t RD_index = (in->instruction >> 11) & 0x1F; // get bits 15:11(rd)
+
+
 
     // set data outputs
-	out->read_data_1 = registerOutputs->read_data_1;
-    out->read_data_2 = registerOutputs->read_data_2;
-    out->immediate = in->instruction & 0x7FFF; // 15:0 // address
- 	out->funct = in->instruction & 0x3F; // bits 5:0 funct
-	out->opcode = opcode;
-    out->pc_plus_4 = in->next_pc;
+	out->read_data_1 = cpu_ctx.GPR[RS_index];     // RegisterFile[rs]
+    out->read_data_2 = cpu_ctx.GPR[RT_index];     // RegisterFile[rt]
+    //              if MSB(immediate field) == 0, then sign extend with leading 0s else sign extend with leading 1s
+    out->immediate = (in->instruction & 0x8000) == 0 ? in->instruction & 0xFFFF : in->instruction & 0xFFFF0000; // 15:0  address
+ 	out->funct = funct; // bits 5:0 funct
+    out->pc_plus_4 = in->next_pc;   //FIX ME: Correct naming later
+
+    out->RS_index = RS_index; // Not used yet. Will be used in conjunction with forwarding unit when pipelining for data hazards
+
+    out->RT_index = RT_index;
+    out->RD_index = RD_index;
+
+
+
 
     // pass signals to next buffer
+    out->reg_dst = cpu_ctx.CNTRL.reg_dst;
     out->mem_write = cpu_ctx.CNTRL.mem_write;
     out->mem_read = cpu_ctx.CNTRL.mem_read;
     out->branch = cpu_ctx.CNTRL.branch;
@@ -72,6 +76,9 @@ int decode( struct IF_ID_buffer *in, struct ID_EX_buffer *out )
 
 int execute( struct ID_EX_buffer *in, struct EX_MEM_buffer *out )
 {
+
+    out->write_reg_index = MULTIPLEXOR(in->reg_dst, in->RD_index, in->RT_index); // Rg_Dst MUX with its inputs and selector
+
     struct ALU_INPUT* alu_input = (struct ALU_INPUT*) malloc(sizeof(struct ALU_INPUT)); // holds inputs
 
     // inputs
@@ -115,7 +122,7 @@ int memory( struct EX_MEM_buffer *in, struct MEM_WB_buffer *out )
 		printf("used not branch!\n");
 	}
 
-	//	pass necessary information to MEM/WB buffer	
+	//	pass necessary information to MEM/WB buffer
 	out->reg_write = in->reg_write;
 	if (in->mem_read) {
 		out->mem_write_data = data_memory[write_address - 0x10000000];
@@ -126,14 +133,13 @@ int memory( struct EX_MEM_buffer *in, struct MEM_WB_buffer *out )
 	return 0;
 }
 
-int writeback( struct MEM_WB_buffer *in )
-{
-	printf("write back is called\n");
+int writeback( struct MEM_WB_buffer *in ){
+
+    in->write_reg_index = MULTIPLEXOR(in->jump, 31, in->write_reg_index);
 	if(in->reg_write) {
-		uint32_t temp = cpu_ctx.GPR[in->write_reg_index];
-		printf("write_reg_index %d", in->write_reg_index);
-		cpu_ctx.GPR[in->write_reg_index] = (in->mem_to_reg) ? in->mem_write_data : in->alu_result;
-		printf("value being changed from %d to %d\n", temp, cpu_ctx.GPR[in->write_reg_index]);
+		//cpu_ctx.GPR[in->write_reg_index] = (in->mem_to_reg) ? in->mem_write_data : in->alu_result;
+		cpu_ctx.GPR[in->write_reg_index] = MULTIPLEXOR(in->mem_to_reg, in->mem_write_data, in->alu_result);
+
 	}
 	return 0;
 }
@@ -144,11 +150,7 @@ int instructionMemory(uint32_t address, struct IF_ID_buffer *out) {
 	return 0;
 }
 
-int registerFile(struct REG_FILE_input* input, struct REG_FILE_output* output) {
-	output->read_data_1 = cpu_ctx.GPR[input->read_reg_1];
-	output->read_data_2 = cpu_ctx.GPR[input->read_reg_2];
-	return 0;
-}
+
 
 int alu(struct ALU_INPUT* alu_input, struct ALU_OUTPUT* out){
 

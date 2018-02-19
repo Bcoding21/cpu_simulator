@@ -19,7 +19,10 @@ struct Control {
 	bool branch;
 	bool mem_to_reg;
     bool alu_source;
+    bool reg_dst;
 	uint32_t alu_op;
+	bool jump;
+	bool jump_register;
 };
 
 uint32_t MULTIPLEXOR(bool selector, uint32_t HIGH_INPUT, uint32_t LOW_INPUT);
@@ -37,9 +40,9 @@ struct cpu_context {
 	uint32_t PC;
 	uint32_t GPR[32];
 	struct Control CNTRL;
-	bool RegDst_MUX;
-	bool ALUSrc_MUX;
-	bool MemtoReg_MUX;
+//	bool RegDst_MUX;        // These must go.
+//	bool ALUSrc_MUX;
+//	bool MemtoReg_MUX;
     enum InstructionFormat instructionFormat;
     enum InstructionType instructionType;
 };
@@ -59,9 +62,13 @@ struct ID_EX_buffer {
     bool branch;
     bool mem_to_reg;
     bool alu_source;
+    bool reg_dst;
+    bool jump;
+    bool jump_register;
     uint32_t alu_op, pc_plus_4;
 	short funct, opcode;
 	uint32_t read_data_1, read_data_2, immediate;
+	uint32_t RS_index, RT_index, RD_index;      // RS_index is needed in the executed stage for forwarding for data hazards
 };
 
 struct EX_MEM_buffer {
@@ -70,6 +77,8 @@ struct EX_MEM_buffer {
 	bool mem_write;
 	bool mem_read;
 	bool mem_to_reg;
+	bool jump;
+	bool jump_register;
 	uint32_t branch_target;
 	bool branch_result;
 	uint32_t alu_result;
@@ -81,6 +90,8 @@ struct EX_MEM_buffer {
 struct MEM_WB_buffer {
 	bool reg_write;
     bool mem_to_reg;
+    bool jump;
+    bool jump_register;
 	uint32_t mem_write_data;
 	uint32_t alu_result;
 	uint32_t write_reg_index;
