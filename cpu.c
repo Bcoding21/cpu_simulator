@@ -39,19 +39,29 @@ int decode( struct IF_ID_buffer *in, struct ID_EX_buffer *out )
 	// Write register will depend on the RegDst multiplexor      gets bits 15:11(rd)                get bits 20:16(rt)
 	registerInputs->write_reg = MULTIPLEXOR(cpu_ctx.RegDst_MUX, (in->instruction >> 11) & 0x1F, registerInputs->read_reg_2);
 //	registerInputs->write_reg = (in->instruction >> 11) & 0x1F; // gets bits 15:11(rd)
-	uint32_t sign_extended_val = in->instruction & 0x7FFF; // 15:0 // address
 	registerInputs->reg_write = cpu_ctx.CNTRL.reg_write; // set register control signal
 
 	struct REG_FILE_output* registerOutputs = (struct REG_FILE_output*) malloc(sizeof(struct REG_FILE_output)); // holds outputs
 
 	registerFile(registerInputs, registerOutputs);
 
-
+    // set data outputs
 	out->read_data_1 = registerOutputs->read_data_1;
-	out->read_data_2 = (cpu_ctx.ALUSrc_MUX) ? sign_extended_val : registerOutputs->read_data_2; // if 1 then set to 16 bit sign extended. else set to output of read reg 2
+    out->read_data_2 = registerOutputs->read_data_2;
+    out->immediate = in->instruction & 0x7FFF; // 15:0 // address
  	out->funct = in->instruction & 0x3F; // bits 5:0 funct
 	out->opcode = opcode;
+    out->pc_plus_4 = in->next_pc;
 
+    // pass signals to next buffer
+    out->mem_write = cpu_ctx.CNTRL.mem_write;
+    out->mem_read = cpu_ctx.CNTRL.mem_read;
+    out->branch = cpu_ctx.CNTRL.branch;
+    out->mem_to_reg = cpu_ctx.CNTRL.mem_to_reg;
+    out->alu_source = cpu_ctx.CNTRL.alu_source;
+    out->reg_write = cpu_ctx.CNTRL.reg_write;
+
+    // debugging
 	printf("opcode: %d\n", out->opcode);
 	printf("read_data_1: %d\n", out->read_data_1);
 	printf("read_data_2: %d\n", out->read_data_2);
@@ -65,23 +75,22 @@ int execute( struct ID_EX_buffer *in, struct EX_MEM_buffer *out )
 
     // inputs
     alu_input->input_1 = in->read_data_1;
-    alu_input->input_2 = in->read_data_2;
+    alu_input->input_2 = (in->alu_source) ? in->immediate : in->read_data_2;
 	alu_input->funct = in->funct;
 	alu_input->opcode = in->opcode;
-    in->
     struct ALU_OUTPUT* alu_output = (struct ALU_OUTPUT*) malloc(sizeof(struct ALU_OUTPUT)); // hold outputs
-
     alu(alu_input, alu_output);
 
     // pass alu results
     out->alu_result = alu_output->alu_result;
     out->branch_result = alu_output->branch_result;
 
-    // pass signals
+    // pass control signals to next buffer
     out->branch = in->branch;
     out->mem_read = in->mem_read;
     out->reg_write = in->reg_write;
     out->mem_write = in->mem_write;
+    out->branch_target = (in->immediate << 2) + in->pc_plus_4;
 	return 0;
 }
 
