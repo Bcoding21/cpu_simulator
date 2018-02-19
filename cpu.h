@@ -56,14 +56,24 @@ struct ID_EX_buffer {
 };
 
 struct EX_MEM_buffer {
-	uint32_t alu_result;
+	bool reg_write;
+	bool branch;
+	bool mem_write;
+	bool mem_read;
+	uint32_t branch_target;
 	bool branch_result;
+	uint32_t alu_result;
 	uint32_t write_data;
-
+	uint32_t write_reg_index;
 };
 
 struct MEM_WB_buffer {
-	uint32_t write_data;
+	bool reg_write;
+	uint32_t mem_write_data;
+	uint32_t alu_result_data;
+	uint32_t write_reg_index;
+	//	reg_write_data and alu_result_data have to both be present for the WB stage to decide whether to wuse
+	// data from memory or alu result based on mem_to_reg value when writin gto register
 };
 
 // Stages

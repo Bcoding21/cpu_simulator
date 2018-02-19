@@ -81,7 +81,17 @@ int execute( struct ID_EX_buffer *in, struct EX_MEM_buffer *out )
 
 int memory( struct EX_MEM_buffer *in, struct MEM_WB_buffer *out )
 {
-
+	uint32_t write_address = in->alu_result;
+	bool branch = in->branch_result;
+	uint32_t write_data = in->write_data;
+	if (in->mem_write) {
+		data_memory[write_address - 0x10000000] = write_data;
+	}
+	if (in->mem_read) {
+		out->mem_write_data = data_memory[write_address - 0x10000000];
+	}
+	out->alu_result_data = write_data;
+	out->write_reg_index = in->write_reg_index;
 	return 0;
 }
 
