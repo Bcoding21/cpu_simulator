@@ -77,7 +77,7 @@ struct EX_MEM_buffer {
 struct MEM_WB_buffer {
 	bool reg_write;
 	uint32_t mem_write_data;
-	uint32_t alu_result_data;
+	uint32_t alu_result;
 	uint32_t write_reg_index;
 	//	reg_write_data and alu_result_data have to both be present for the WB stage to decide whether to wuse
 	// data from memory or alu result based on mem_to_reg value when writin gto register

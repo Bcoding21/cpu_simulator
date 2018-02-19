@@ -93,16 +93,22 @@ int memory( struct EX_MEM_buffer *in, struct MEM_WB_buffer *out )
 	if (in->mem_write) {
 		data_memory[write_address - 0x10000000] = write_data;
 	}
+
+	//	pass necessary information to MEM/WB buffer	
+	out->reg_write = in->reg_write;
 	if (in->mem_read) {
 		out->mem_write_data = data_memory[write_address - 0x10000000];
 	}
-	out->alu_result_data = write_data;
+	out->alu_result = write_data;
 	out->write_reg_index = in->write_reg_index;
 	return 0;
 }
 
 int writeback( struct MEM_WB_buffer *in )
 {
+	if(in->reg_write) {
+		cpu_ctx.PC[in->write_reg_index] = (in->reg_write) ? in->mem_write : in->alu_result;
+	}
 	return 0;
 }
 
