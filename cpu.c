@@ -15,31 +15,32 @@
 int instructionMemory(uint32_t address, struct IF_ID_buffer *out);
 int registerFile(struct REG_FILE_input* input, struct REG_FILE_output* output);
 int alu(struct ALU_INPUT* alu_input, struct ALU_OUTPUT* out);
+int setControlSignals(short opcode, short funct);
 
 struct cpu_context cpu_ctx;
 
 int fetch(struct IF_ID_buffer *out )
 {
 	instructionMemory(cpu_ctx.PC, out);
-	out->next_pc = cpu_ctx.PC + 1;
+	out->pc_plus_4 = cpu_ctx.PC + 1;
 	return 0;
 }
 
 int decode( struct IF_ID_buffer *in, struct ID_EX_buffer *out )
 {
 	short opcode = in->instruction >> 26; // gets bits 31:26
-	short funct = in->instruction & 0x3F // gets bits 5:0
+	short funct = in->instruction & 0x3F; // gets bits 5:0
 
 	setControlSignals(opcode, funct); // set the control signals
 
-
-
     uint32_t RS_index = (in->instruction >> 21) & 0x1F; // get bits 25:21 (rs)
     uint32_t RT_index = (in->instruction >> 16) & 0x1F; // get bits 20:16(rt)
-
     uint32_t RD_index = (in->instruction >> 11) & 0x1F; // get bits 15:11(rd)
-
-
+    //	get jump target address
+    uint32_t jump_target_address = in->instruction & 0x3FFFFFF;
+    jump_target_address = jump_target_address << 2;
+    //	get pc_plus_4 leftmost 4 bits
+    jump_target_address = (in->pc_plus_4 & 0xF0000000 ) | jump_target_address;
 
     // set data outputs
 	out->read_data_1 = cpu_ctx.GPR[RS_index];     // RegisterFile[rs]
@@ -47,15 +48,12 @@ int decode( struct IF_ID_buffer *in, struct ID_EX_buffer *out )
     //              if MSB(immediate field) == 0, then sign extend with leading 0s else sign extend with leading 1s
     out->immediate = (in->instruction & 0x8000) == 0 ? in->instruction & 0xFFFF : in->instruction & 0xFFFF0000; // 15:0  address
  	out->funct = funct; // bits 5:0 funct
-    out->pc_plus_4 = in->next_pc;   //FIX ME: Correct naming later
+    out->pc_plus_4 = in->pc_plus_4;   //FIX ME: Correct naming later
 
     out->RS_index = RS_index; // Not used yet. Will be used in conjunction with forwarding unit when pipelining for data hazards
 
     out->RT_index = RT_index;
     out->RD_index = RD_index;
-
-
-
 
     // pass signals to next buffer
     out->reg_dst = cpu_ctx.CNTRL.reg_dst;
@@ -65,6 +63,8 @@ int decode( struct IF_ID_buffer *in, struct ID_EX_buffer *out )
     out->mem_to_reg = cpu_ctx.CNTRL.mem_to_reg;
     out->alu_source = cpu_ctx.CNTRL.alu_source;
     out->reg_write = cpu_ctx.CNTRL.reg_write;
+    out->jump_register = cpu_ctx.CNTRL.jump_register;
+    out->jump_target_address = jump_target_address;
 
     // debugging
 	printf("opcode: %d\n", out->opcode);
@@ -80,13 +80,16 @@ int execute( struct ID_EX_buffer *in, struct EX_MEM_buffer *out )
     out->write_reg_index = MULTIPLEXOR(in->reg_dst, in->RD_index, in->RT_index); // Rg_Dst MUX with its inputs and selector
 
     struct ALU_INPUT* alu_input = (struct ALU_INPUT*) malloc(sizeof(struct ALU_INPUT)); // holds inputs
+    struct ALU_OUTPUT* alu_output = (struct ALU_OUTPUT*) malloc(sizeof(struct ALU_OUTPUT)); // hold outputs
 
     // inputs
-    alu_input->input_1 = in->read_data_1;
-    alu_input->input_2 = (in->alu_source) ? in->immediate : in->read_data_2;
+    //	use MUX to pick PC + 4 and 0 for jal instruction to be stored in $ra ($31).
+    alu_input->input_1 = MULTIPLEXOR(in->jump, in->pc_plus_4, in->read_data_1);
+    uint32_t alu_src_mux_output = MULTIPLEXOR(in->alu_source, in->immediate, in->read_data_2);
+    alu_input->input_2 = MULTIPLEXOR(in->jump, 0, alu_src_mux_output);
+
 	alu_input->funct = in->funct;
 	alu_input->opcode = in->opcode;
-    struct ALU_OUTPUT* alu_output = (struct ALU_OUTPUT*) malloc(sizeof(struct ALU_OUTPUT)); // hold outputs
     alu(alu_input, alu_output);
 
     // pass alu results
@@ -101,6 +104,9 @@ int execute( struct ID_EX_buffer *in, struct EX_MEM_buffer *out )
     out->mem_to_reg = in->mem_to_reg;
     out->pc_plus_4 = in->pc_plus_4;
     out->branch_target = (in->immediate << 2) + in->pc_plus_4;
+    out->jump_register = in->jump_register;
+    out->jump_target_address = in->jump_target_address;
+
 	return 0;
 }
 
@@ -114,13 +120,10 @@ int memory( struct EX_MEM_buffer *in, struct MEM_WB_buffer *out )
 	}
 
 	//fake implementation of PCSrc signal and MUX
-	if (in->branch && in->branch_result) {
-		cpu_ctx.PC = in->branch_target;
-		printf("used branch!\n");
-	} else {
-		cpu_ctx.PC = in->pc_plus_4;
-		printf("used not branch!\n");
-	}
+	bool pc_src = in->branch && in->branch_result;
+	uint32_t pc_src_mux_output = MULTIPLEXOR(pc_src, in->branch_target, in->pc_plus_4);
+	uint32_t jump_mux_output = MULTIPLEXOR(in->jump, in->jump_target_address, pc_src_mux_output);
+	cpu_ctx.PC  = MULTIPLEXOR (in->jump_register, cpu_ctx.GPR[31], jump_mux_output);
 
 	//	pass necessary information to MEM/WB buffer
 	out->reg_write = in->reg_write;
@@ -244,88 +247,77 @@ int alu(struct ALU_INPUT* alu_input, struct ALU_OUTPUT* out){
     return 0;
 }
 
-int setControlState(short opcode) { // sets control signal outputs
-
-	setInstructionFormat(opcode);
-	setMultiplexors();
-
-	switch (cpu_ctx.instructionType){
-
-		case R_TYPE:
+int setControlSignals(short opcode, short funct) { // sets control signal outputs
+	// R type instruction
+	if(opcode == 0x0) {
+		if (funct == 0x8) {	// jr $ra should not write to regiser file
+			cpu_ctx.CNTRL.reg_write = false;
+			cpu_ctx.CNTRL.jump_register = true;
+		}
+		else {
 			cpu_ctx.CNTRL.reg_write = true;
-			cpu_ctx.CNTRL.mem_read = false;
-			cpu_ctx.CNTRL.mem_write = false;
-			cpu_ctx.CNTRL.branch = false;
-			break;
+			cpu_ctx.CNTRL.jump_register = false;
+		}	
+		//False signals
+		cpu_ctx.CNTRL.mem_read = false;
+		cpu_ctx.CNTRL.mem_write = false;
+		cpu_ctx.CNTRL.branch = false;
+		cpu_ctx.CNTRL.mem_to_reg = false;
+		cpu_ctx.CNTRL.alu_source = false;
+		cpu_ctx.CNTRL.jump = false;
+		//True signals
+		cpu_ctx.CNTRL.reg_dst = true;
+	} 
+	//				   j   			   jal
+	else if(opcode == 0x2 || opcode == 0x3) {
+		if (funct == 0x2) {	// j should not write to regiser file
+			cpu_ctx.CNTRL.reg_write = false;
+		}				  
+		else if (funct == 0x3) {//jal should write to the register file ($ra, $31)
+			cpu_ctx.CNTRL.reg_write = true;
+		}	
+		//	False signals
+		cpu_ctx.CNTRL.mem_read = false;
+		cpu_ctx.CNTRL.mem_write = false;
+		cpu_ctx.CNTRL.branch = false;
+		cpu_ctx.CNTRL.mem_to_reg = false;
+		cpu_ctx.CNTRL.alu_source = false;	// really a don't care
+		cpu_ctx.CNTRL.reg_dst = false;		// really a don't care
 
-		case LOAD_WORD:
+		//True signals
+		cpu_ctx.CNTRL.jump = true;
+	}
+	// I type instructions
+	else {	// see table
+		cpu_ctx.CNTRL.reg_write = true;
+		cpu_ctx.CNTRL.mem_read = false;
+		cpu_ctx.CNTRL.mem_write = false;
+		cpu_ctx.CNTRL.branch = false;
+		cpu_ctx.CNTRL.mem_to_reg = false;
+		cpu_ctx.CNTRL.alu_source = true;
+		cpu_ctx.CNTRL.jump = false;
+		cpu_ctx.CNTRL.reg_dst = false;
+		cpu_ctx.CNTRL.jump_register = false;
+					//bne              beq
+		if (opcode == 0x5 || opcode == 0x4) {
+			cpu_ctx.CNTRL.reg_write = false;
+			cpu_ctx.CNTRL.branch= true;
+			// reg_dst for beq and bne are falsely dont care
+		}
+					//		lw
+		else if ( opcode == 0x23 ) {
 			cpu_ctx.CNTRL.reg_write = true;
 			cpu_ctx.CNTRL.mem_read = true;
 			cpu_ctx.CNTRL.mem_write = false;
-			cpu_ctx.CNTRL.branch = false;
-			break;
-
-		case STORE_WORD:
+			cpu_ctx.CNTRL.mem_to_reg = true;
+		} 			//		sw
+		else if (opcode == 0x2B) {
 			cpu_ctx.CNTRL.reg_write = false;
-			cpu_ctx.CNTRL.mem_read = false;
+			cpu_ctx.CNTRL.mem_read = false; // dont care
 			cpu_ctx.CNTRL.mem_write = true;
-			cpu_ctx.CNTRL.branch = false;
-			break;
-
-		case BRANCH:
-			cpu_ctx.CNTRL.reg_write = false;
-			cpu_ctx.CNTRL.mem_read = false;
-			cpu_ctx.CNTRL.mem_write = false;
-			cpu_ctx.CNTRL.branch = true;
-			break;
-
-		default:
-			break;
+			cpu_ctx.CNTRL.mem_to_reg = false; //dont care
+		} 
 	}
-
-}
-
-void setInstructionFormat(short opcode) {
-	if (opcode == 0) {
-		cpu_ctx.instructionFormat = R_FORMAT;
-		cpu_ctx.instructionType = R_TYPE;
-	}
-
-	else if (opcode > 0 && opcode < 4){
-		cpu_ctx.instructionFormat = I_FORMAT;
-		cpu_ctx.instructionType = BRANCH;
-	}
-
-	else if (opcode > 3){
-		cpu_ctx.instructionFormat = I_FORMAT;
-		cpu_ctx.instructionType = (opcode == 0x2b) ? STORE_WORD : LOAD_WORD;
-	}
-
-	else{
-		cpu_ctx.instructionFormat = NO_OP;
-	}
-}
-
-void setMultiplexors() { // sets multiplexor states
-	if (cpu_ctx.instructionType == R_TYPE) {
-		cpu_ctx.RegDst_MUX = true;
-		cpu_ctx.ALUSrc_MUX = false;
-		cpu_ctx.MemtoReg_MUX = false;
-
-	}
-
-	else if (cpu_ctx.instructionType == LOAD_WORD) {
-		cpu_ctx.RegDst_MUX = false;
-		cpu_ctx.ALUSrc_MUX = true;
-		cpu_ctx.MemtoReg_MUX = true;
-	}
-
-	else if (cpu_ctx.instructionType == STORE_WORD){
-		cpu_ctx.RegDst_MUX = true;
-		cpu_ctx.ALUSrc_MUX = false;
-		cpu_ctx.MemtoReg_MUX = false;
-	}
-
 }
 
 uint32_t MULTIPLEXOR(bool selector, uint32_t HIGH_INPUT, uint32_t LOW_INPUT){

@@ -27,7 +27,6 @@ struct Control {
 
 uint32_t MULTIPLEXOR(bool selector, uint32_t HIGH_INPUT, uint32_t LOW_INPUT);
 
-
 enum InstructionType{
     LOAD_WORD, STORE_WORD, BRANCH, R_TYPE
 };
@@ -40,9 +39,6 @@ struct cpu_context {
 	uint32_t PC;
 	uint32_t GPR[32];
 	struct Control CNTRL;
-//	bool RegDst_MUX;        // These must go.
-//	bool ALUSrc_MUX;
-//	bool MemtoReg_MUX;
     enum InstructionFormat instructionFormat;
     enum InstructionType instructionType;
 };
@@ -51,9 +47,8 @@ extern struct cpu_context cpu_ctx;
 
 struct IF_ID_buffer {
 	uint32_t instruction;
-	uint32_t next_pc;
+	uint32_t pc_plus_4;
 };
-
 
 struct ID_EX_buffer {
     bool reg_write;
@@ -65,6 +60,7 @@ struct ID_EX_buffer {
     bool reg_dst;
     bool jump;
     bool jump_register;
+    uint32_t jump_target_address;
     uint32_t alu_op, pc_plus_4;
 	short funct, opcode;
 	uint32_t read_data_1, read_data_2, immediate;
@@ -85,6 +81,8 @@ struct EX_MEM_buffer {
 	uint32_t write_data;
 	uint32_t write_reg_index;
 	uint32_t pc_plus_4;
+	uint32_t jump_target_address;
+
 };
 
 struct MEM_WB_buffer {
