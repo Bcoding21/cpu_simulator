@@ -68,6 +68,7 @@ int decode( struct IF_ID_buffer *in, struct ID_EX_buffer *out )
     out->reg_write = cpu_ctx.CNTRL.reg_write;
     out->jump_register = cpu_ctx.CNTRL.jump_register;
     out->jump_target_address = jump_target_address;
+    out->opcode = opcode;
 
     // debugging
 	printf("opcode: %d\n", out->opcode);
@@ -111,6 +112,7 @@ int execute( struct ID_EX_buffer *in, struct EX_MEM_buffer *out )
     out->branch_target = (in->immediate << 2) + in->pc_plus_4;
     out->jump_register = in->jump_register;
     out->jump_target_address = in->jump_target_address;
+    printf("execute stage calculation result is: %d\n", out->alu_result);
 
 	return 0;
 }
@@ -132,10 +134,10 @@ int memory( struct EX_MEM_buffer *in, struct MEM_WB_buffer *out )
 	//	pass necessary information to MEM/WB buffer
 	out->reg_write = in->reg_write;
 	if (in->mem_read) {
-		out->mem_write_data = data_memory[write_address - 0x10000000];
+		out->mem_read_data = data_memory[write_address - 0x10000000];
 	}
 	out->mem_to_reg = in->mem_to_reg;
-	out->alu_result = write_data;
+	out->alu_result = in->alu_result;
 	out->write_reg_index = in->write_reg_index;
 	return 0;
 }
@@ -144,8 +146,9 @@ int writeback( struct MEM_WB_buffer *in ){
 
     in->write_reg_index = MULTIPLEXOR(in->jump, 31, in->write_reg_index);
 	if(in->reg_write) {
+		printf("writing to register %d, value   %d.\n", in->write_reg_index, in->alu_result);
 		//cpu_ctx.GPR[in->write_reg_index] = (in->mem_to_reg) ? in->mem_write_data : in->alu_result;
-		cpu_ctx.GPR[in->write_reg_index] = MULTIPLEXOR(in->mem_to_reg, in->mem_write_data, in->alu_result);
+		cpu_ctx.GPR[in->write_reg_index] = MULTIPLEXOR(in->mem_to_reg, in->mem_read_data, in->alu_result);
 
 	}
 	return 0;
@@ -158,6 +161,7 @@ int instructionMemory(uint32_t address, struct IF_ID_buffer *out) {
 }
 
 int alu(struct ALU_INPUT* alu_input, struct ALU_OUTPUT* out){
+	printf("opcode in alu is: %d", alu_input->opcode);
 	if (alu_input->opcode == 0x00) { // R-format and syscall
 		// add instructions:
 		if (alu_input->funct == 0x20) { out->alu_result = alu_input->input_1 + alu_input->input_2; }				//add
@@ -172,7 +176,8 @@ int alu(struct ALU_INPUT* alu_input, struct ALU_OUTPUT* out){
         // Input casted to signed then shifted, then result is casted to unsigned to keep with out->alu_result type of uint32_t
 		else if (alu_input->funct == 0x03) {out->alu_result = (uint32_t) ((int32_t)alu_input->input_1 >> alu_input->shamt);} // sra
 
-		else if(alu_input->funct == 0x26)  { out->alu_result = alu_input->input_1 ^ alu_input->input_2; }             // xor
+		else if(alu_input->funct == 0x26)  { out->alu_result = alu_input->input_1 ^ alu_input->input_2;
+		printf("xoring %d with %d\n", alu_input->input_1, alu_input->input_2); }             // xor
 		// No operation need for jr
 
 		// FIX ME: Conditions for syscall maybe
@@ -185,11 +190,12 @@ int alu(struct ALU_INPUT* alu_input, struct ALU_OUTPUT* out){
 	}
 	// I format instructions.
 	else {
-        if (alu_input->opcode == 0x08 ) {out->alu_result = alu_input->input_1 + alu_input->input_2;}                        // addi
+		printf("doing i format\n");
+        if (alu_input->opcode == 0x08 ) {out->alu_result = alu_input->input_1 + alu_input->input_2; printf("doing addi with %d and %d\n", alu_input->input_1, alu_input->input_2 );}                        // addi
         else if (alu_input->opcode == 0x0C ) {out->alu_result = alu_input->input_1 & alu_input->input_2;}                   // andi
         else if (alu_input->opcode == 0x0F ) {out->alu_result = (alu_input->input_2 << 16);}                                // lui
         else if (alu_input->opcode == 0x0D ) {out->alu_result = alu_input->input_1 | alu_input->input_2;}                   // ori
-        else if (alu_input->opcode == 0x0A )  { out->alu_result = (alu_input->input_1 < alu_input->input_2) ? 1 : 0; }	    //slti
+        else if (alu_input->opcode == 0x0A )  { out->alu_result = (alu_input->input_1 < alu_input->input_2) ? 1 : 0; }	    // slti
         else if(alu_input->opcode == 0x0E)  { out->alu_result = alu_input->input_1 ^ alu_input->input_2; }                  // xori
 
         else if (alu_input->opcode == 0x04) {out->branch_result = (alu_input->input_1 == alu_input->input_2) ? 1 : 0 ;}     // beq
