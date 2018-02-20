@@ -12,6 +12,7 @@
 #include "memory.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include "syscall.h"
 int instructionMemory(uint32_t address, struct IF_ID_buffer *out);
 int registerFile(struct REG_FILE_input* input, struct REG_FILE_output* output);
 int alu(struct ALU_INPUT* alu_input, struct ALU_OUTPUT* out);
@@ -27,12 +28,17 @@ int fetch(struct IF_ID_buffer *out )
 
 int decode( struct IF_ID_buffer *in, struct ID_EX_buffer *out )
 {
+	printf("decode\n");
 	short opcode = in->instruction >> 26; // gets bits 31:26
-	short funct = in->instruction & 0x3F // gets bits 5:0
+	short funct = in->instruction & 0x3F; // gets bits 5:0
 
-	setControlSignals(opcode, funct); // set the control signals
+	//setControlSignals(opcode, funct); // set the control signals
 
-
+	// TODO: move to setControlSignals
+	if (opcode == 0 && funct == 0xc && ((in->instruction & 0x3FFFFC0) == 0)) {  // check if it's a syscall
+		printf("decode/syscall\n");
+		cpu_ctx.interrupt= true;
+	}
 
     uint32_t RS_index = (in->instruction >> 21) & 0x1F; // get bits 25:21 (rs)
     uint32_t RT_index = (in->instruction >> 16) & 0x1F; // get bits 20:16(rt)
@@ -65,6 +71,7 @@ int decode( struct IF_ID_buffer *in, struct ID_EX_buffer *out )
     out->mem_to_reg = cpu_ctx.CNTRL.mem_to_reg;
     out->alu_source = cpu_ctx.CNTRL.alu_source;
     out->reg_write = cpu_ctx.CNTRL.reg_write;
+		out->interrupt = cpu_ctx.interrupt;
 
     // debugging
 	printf("opcode: %d\n", out->opcode);
@@ -76,8 +83,16 @@ int decode( struct IF_ID_buffer *in, struct ID_EX_buffer *out )
 
 int execute( struct ID_EX_buffer *in, struct EX_MEM_buffer *out )
 {
-
     out->write_reg_index = MULTIPLEXOR(in->reg_dst, in->RD_index, in->RT_index); // Rg_Dst MUX with its inputs and selector
+		printf("execute\n");
+		// interrupt
+		if (in->interrupt) {
+			printf("execute/syscall\n");
+			syscall(cpu_ctx.GPR[2], cpu_ctx.GPR[4]);
+			out->pc_plus_4 = in->pc_plus_4;
+			return 0;
+		}
+
 
     struct ALU_INPUT* alu_input = (struct ALU_INPUT*) malloc(sizeof(struct ALU_INPUT)); // holds inputs
 

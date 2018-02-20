@@ -40,9 +40,10 @@ struct cpu_context {
 	uint32_t PC;
 	uint32_t GPR[32];
 	struct Control CNTRL;
-//	bool RegDst_MUX;        // These must go.
-//	bool ALUSrc_MUX;
-//	bool MemtoReg_MUX;
+	bool RegDst_MUX;        // These must go.
+	bool ALUSrc_MUX;
+	bool MemtoReg_MUX;
+	bool interrupt;
     enum InstructionFormat instructionFormat;
     enum InstructionType instructionType;
 };
@@ -69,6 +70,7 @@ struct ID_EX_buffer {
 	short funct, opcode;
 	uint32_t read_data_1, read_data_2, immediate;
 	uint32_t RS_index, RT_index, RD_index;      // RS_index is needed in the executed stage for forwarding for data hazards
+	bool interrupt;
 };
 
 struct EX_MEM_buffer {
@@ -157,4 +159,3 @@ int alu(struct ALU_INPUT* in, struct ALU_OUTPUT* out);
 int setControlState(short);
 void setInstructionFormat(short);
 void setMultiplexors();
-
