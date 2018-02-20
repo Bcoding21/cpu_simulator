@@ -62,21 +62,21 @@ int main( int argc, char *argv[] )
 	fclose(f);
 	int count = 0;
 
-	while(count < 13) {
+	while(count < 14) {
 // #if defined(DEBUG)
 // 		printf("FETCH from PC=%x\n", cpu_ctx.PC);
 // #endif
 		printf("Start: \n");
-		printf("GPR[8]: %d\n", cpu_ctx.GPR[8]);
-		printf("GPR[9]: %d\n", cpu_ctx.GPR[9]);
+		printf("GPR[2]: %d\n", cpu_ctx.GPR[2]);
+		printf("GPR[4]: %d\n", cpu_ctx.GPR[4]);
 		fetch( if_id );
 		decode( if_id, &id_ex );
 		execute( &id_ex, &ex_mem );
 		memory( &ex_mem, &mem_wb );
 		writeback( &mem_wb );
 		printf("End: \n");
-		printf("GPR[8]: %d\n", cpu_ctx.GPR[8]);
-		printf("GPR[9]: %d\n", cpu_ctx.GPR[9]);
+		printf("GPR[2]: %d\n", cpu_ctx.GPR[2]);
+		printf("GPR[4]: %d\n", cpu_ctx.GPR[4]);
 		if ( cpu_ctx.PC == 0 ) {
 			break;
 		}

@@ -37,6 +37,8 @@ int decode( struct IF_ID_buffer *in, struct ID_EX_buffer *out )
 	if (opcode == 0 && funct == 0xc && ((in->instruction & 0x3FFFFC0) == 0)) {  // check if it's a syscall
 		printf("decode/syscall\n");
 		cpu_ctx.interrupt= true;
+	} else {
+		cpu_ctx.interrupt = false;
 	}
 
 	short shamt = (in->instruction >> 6) & 0x1F; // gets bits 10:6
@@ -74,9 +76,9 @@ int decode( struct IF_ID_buffer *in, struct ID_EX_buffer *out )
     out->mem_to_reg = cpu_ctx.CNTRL.mem_to_reg;
     out->alu_source = cpu_ctx.CNTRL.alu_source;
     out->reg_write = cpu_ctx.CNTRL.reg_write;
-		out->interrupt = cpu_ctx.interrupt;
     out->jump_register = cpu_ctx.CNTRL.jump_register;
     out->jump_target_address = jump_target_address;
+		out->interrupt = cpu_ctx.interrupt;
 
     // debugging
 	printf("opcode: %d\n", out->opcode);
@@ -90,10 +92,12 @@ int execute( struct ID_EX_buffer *in, struct EX_MEM_buffer *out )
 {
     out->write_reg_index = MULTIPLEXOR(in->reg_dst, in->RD_index, in->RT_index); // Rg_Dst MUX with its inputs and selector
 		printf("execute\n");
+		printf("$v0:%d\n", cpu_ctx.GPR[2]);
+		printf("$a0:%d\n", cpu_ctx.GPR[4]);
 		// interrupt
 		if (in->interrupt) {
 			printf("execute/syscall\n");
-			syscall(cpu_ctx.GPR[2], cpu_ctx.GPR[4]);
+			syscall(2, cpu_ctx.GPR[2], cpu_ctx.GPR[4]);
 			out->pc_plus_4 = in->pc_plus_4;
 			return 0;
 		}
@@ -128,12 +132,17 @@ int execute( struct ID_EX_buffer *in, struct EX_MEM_buffer *out )
     out->branch_target = (in->immediate << 2) + in->pc_plus_4;
     out->jump_register = in->jump_register;
     out->jump_target_address = in->jump_target_address;
+		out->interrupt = cpu_ctx.interrupt;
 
 	return 0;
 }
 
 int memory( struct EX_MEM_buffer *in, struct MEM_WB_buffer *out )
 {
+	if (in->interrupt) {
+		printf("memory/syscall\n");
+		return 0;
+	}
 	uint32_t write_address = in->alu_result;
 	uint32_t write_data = in->read_data_2;
 	if (in->mem_write) {
@@ -154,11 +163,16 @@ int memory( struct EX_MEM_buffer *in, struct MEM_WB_buffer *out )
 	out->mem_to_reg = in->mem_to_reg;
 	out->alu_result = write_data;
 	out->write_reg_index = in->write_reg_index;
+	out->interrupt = cpu_ctx.interrupt;
 	return 0;
 }
 
 int writeback( struct MEM_WB_buffer *in ){
 
+	if (in->interrupt) {
+		printf("memory/syscall\n");
+		return 0;
+	}
     in->write_reg_index = MULTIPLEXOR(in->jump, 31, in->write_reg_index);
 	if(in->reg_write) {
 		//cpu_ctx.GPR[in->write_reg_index] = (in->mem_to_reg) ? in->mem_write_data : in->alu_result;
