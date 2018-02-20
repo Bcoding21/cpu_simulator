@@ -60,7 +60,7 @@ struct ID_EX_buffer {
     bool jump_register;
     uint32_t jump_target_address;
     uint32_t alu_op, pc_plus_4;
-	short funct, opcode;
+	short funct, opcode, shamt;
 	uint32_t read_data_1, read_data_2, immediate;
 	uint32_t RS_index, RT_index, RD_index;      // RS_index is needed in the executed stage for forwarding for data hazards
 };
@@ -115,7 +115,7 @@ struct REG_FILE_output {
 // ALU I/O
 struct ALU_INPUT {
 	uint32_t input_1, input_2, immediate;
-	short funct, opcode;
+	short funct, opcode, shamt;
 };
 
 struct ALU_OUTPUT {
