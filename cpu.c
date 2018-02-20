@@ -30,6 +30,7 @@ int decode( struct IF_ID_buffer *in, struct ID_EX_buffer *out )
 {
 	short opcode = in->instruction >> 26; // gets bits 31:26
 	short funct = in->instruction & 0x3F; // gets bits 5:0
+	short shamt = (in->instruction >> 6) & 0x1F; // gets bits 10:6
 
 	setControlSignals(opcode, funct); // set the control signals
 
@@ -48,7 +49,9 @@ int decode( struct IF_ID_buffer *in, struct ID_EX_buffer *out )
     //              if MSB(immediate field) == 0, then sign extend with leading 0s else sign extend with leading 1s
     out->immediate = (in->instruction & 0x8000) == 0 ? in->instruction & 0xFFFF : in->instruction & 0xFFFF0000; // 15:0  address
  	out->funct = funct; // bits 5:0 funct
-    out->pc_plus_4 = in->pc_plus_4;   //FIX ME: Correct naming later
+
+    out->shamt = shamt;
+    out->pc_plus_4 = in->pc_plus_4;
 
     out->RS_index = RS_index; // Not used yet. Will be used in conjunction with forwarding unit when pipelining for data hazards
 
@@ -88,8 +91,10 @@ int execute( struct ID_EX_buffer *in, struct EX_MEM_buffer *out )
     uint32_t alu_src_mux_output = MULTIPLEXOR(in->alu_source, in->immediate, in->read_data_2);
     alu_input->input_2 = MULTIPLEXOR(in->jump, 0, alu_src_mux_output);
 
+    // alu_input will take funct, opcode and shamt
 	alu_input->funct = in->funct;
 	alu_input->opcode = in->opcode;
+	alu_input->shamt = in->shamt;
     alu(alu_input, alu_output);
 
     // pass alu results
@@ -113,7 +118,6 @@ int execute( struct ID_EX_buffer *in, struct EX_MEM_buffer *out )
 int memory( struct EX_MEM_buffer *in, struct MEM_WB_buffer *out )
 {
 	uint32_t write_address = in->alu_result;
-	bool branch = in->branch_result;
 	uint32_t write_data = in->read_data_2;
 	if (in->mem_write) {
 		data_memory[write_address - 0x10000000] = write_data;
@@ -154,35 +158,62 @@ int instructionMemory(uint32_t address, struct IF_ID_buffer *out) {
 }
 
 int alu(struct ALU_INPUT* alu_input, struct ALU_OUTPUT* out){
-	if (alu_input->opcode == 0x0) { // R-format and syscall
+	if (alu_input->opcode == 0x00) { // R-format and syscall
 		// add instructions:
 		if (alu_input->funct == 0x20) { out->alu_result = alu_input->input_1 + alu_input->input_2; }				//add
 		else if(alu_input->funct == 0x24)  { out->alu_result = alu_input->input_1 & alu_input->input_2; }			//and
 		else if(alu_input->funct == 0x27)  { out->alu_result = ~(alu_input->input_1 | alu_input->input_2); }		//nor
 		else if(alu_input->funct == 0x25)  { out->alu_result = alu_input->input_1 | alu_input->input_2; }			//or
 		else if(alu_input->funct == 0x2A)  { out->alu_result = (alu_input->input_1 < alu_input->input_2) ? 1 : 0; }	//slt
+		else if (alu_input->funct == 0x00) {out->alu_result = alu_input->input_1 << alu_input->shamt;}              // sll
+		else if (alu_input->funct == 0x02) {out->alu_result = alu_input->input_1 >> alu_input->shamt;}              // srl
+        else if(alu_input->funct == 0x22)  { out->alu_result = alu_input->input_1 - alu_input->input_2; }           // sub
+
+        // Input casted to signed then shifted, then result is casted to unsigned to keep with out->alu_result type of uint32_t
+		else if (alu_input->funct == 0x03) {out->alu_result = (uint32_t) ((int32_t)alu_input->input_1 >> alu_input->shamt);} // sra
+
+		else if(alu_input->funct == 0x26)  { out->alu_result = alu_input->input_1 ^ alu_input->input_2; }             // xor
+		// No operation need for jr
+
+		// FIX ME: Conditions for syscall maybe
+
 	}
-	// Jal 
-	else if(alu_input->opcode == 0x2 || alu_input->opcode == 0x3 ) {
-		// No need to do anything.
+	//                  J                              Jal
+	else if(alu_input->opcode == 0x02 || alu_input->opcode == 0x03 ) {
+		// No need to do anything for J just add both alu inputs for Jal. Specifications handled in the Jal MUX area
+		if (alu_input->opcode == 0x03 ) {out->alu_result = alu_input->input_1 + alu_input->input_2;}                  // Jal
 	}
 	// I format instructions.
 	else {
+        if (alu_input->opcode == 0x08 ) {out->alu_result = alu_input->input_1 + alu_input->input_2;}                        // addi
+        else if (alu_input->opcode == 0x0C ) {out->alu_result = alu_input->input_1 & alu_input->input_2;}                   // andi
+        else if (alu_input->opcode == 0x0F ) {out->alu_result = (alu_input->input_2 << 16);}                                // lui
+        else if (alu_input->opcode == 0x0D ) {out->alu_result = alu_input->input_1 | alu_input->input_2;}                   // ori
+        else if (alu_input->opcode == 0x0A )  { out->alu_result = (alu_input->input_1 < alu_input->input_2) ? 1 : 0; }	    //slti
+        else if(alu_input->opcode == 0x0E)  { out->alu_result = alu_input->input_1 ^ alu_input->input_2; }                  // xori
+
+        else if (alu_input->opcode == 0x04) {out->branch_result = (alu_input->input_1 == alu_input->input_2) ? 1 : 0 ;}     // beq
+        else if (alu_input->opcode == 0x05) {out->branch_result = (alu_input->input_1 != alu_input->input_2) ? 1 : 0 ;}     // bne
+
+        else if (alu_input->opcode == 0x23 ) {out->alu_result = alu_input->input_1 + alu_input->input_2;}                   // lw
+        else if (alu_input->opcode == 0x2B ) {out->alu_result = alu_input->input_1 + alu_input->input_2;}                   // sw
 
 	}
+
+	return 0;
 }
 
 int setControlSignals(short opcode, short funct) { // sets control signal outputs
 	// R type instruction
-	if(opcode == 0x0) {
-		if (funct == 0x8) {	// jr $ra should not write to regiser file
+	if(opcode == 0x00) {
+		if (funct == 0x08) {	// jr $ra should not write to regiser file
 			cpu_ctx.CNTRL.reg_write = false;
 			cpu_ctx.CNTRL.jump_register = true;
 		}
 		else {
 			cpu_ctx.CNTRL.reg_write = true;
 			cpu_ctx.CNTRL.jump_register = false;
-		}	
+		}
 		//False signals
 		cpu_ctx.CNTRL.mem_read = false;
 		cpu_ctx.CNTRL.mem_write = false;
@@ -192,15 +223,15 @@ int setControlSignals(short opcode, short funct) { // sets control signal output
 		cpu_ctx.CNTRL.jump = false;
 		//True signals
 		cpu_ctx.CNTRL.reg_dst = true;
-	} 
+	}
 	//				   j   			   jal
-	else if(opcode == 0x2 || opcode == 0x3) {
-		if (funct == 0x2) {	// j should not write to regiser file
+	else if(opcode == 0x02 || opcode == 0x03) {
+		if (funct == 0x02) {	// j should not write to regiser file
 			cpu_ctx.CNTRL.reg_write = false;
-		}				  
-		else if (funct == 0x3) {//jal should write to the register file ($ra, $31)
+		}
+		else if (funct == 0x03) {//jal should write to the register file ($ra, $31)
 			cpu_ctx.CNTRL.reg_write = true;
-		}	
+		}
 		//	False signals
 		cpu_ctx.CNTRL.mem_read = false;
 		cpu_ctx.CNTRL.mem_write = false;
@@ -224,7 +255,7 @@ int setControlSignals(short opcode, short funct) { // sets control signal output
 		cpu_ctx.CNTRL.reg_dst = false;
 		cpu_ctx.CNTRL.jump_register = false;
 					//bne              beq
-		if (opcode == 0x5 || opcode == 0x4) {
+		if (opcode == 0x05 || opcode == 0x04) {
 			cpu_ctx.CNTRL.reg_write = false;
 			cpu_ctx.CNTRL.branch= true;
 			// reg_dst for beq and bne are falsely dont care
@@ -241,8 +272,10 @@ int setControlSignals(short opcode, short funct) { // sets control signal output
 			cpu_ctx.CNTRL.mem_read = false; // dont care
 			cpu_ctx.CNTRL.mem_write = true;
 			cpu_ctx.CNTRL.mem_to_reg = false; //dont care
-		} 
+		}
 	}
+
+	return 0;
 }
 
 uint32_t MULTIPLEXOR(bool selector, uint32_t HIGH_INPUT, uint32_t LOW_INPUT){
