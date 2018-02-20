@@ -92,7 +92,7 @@ struct MEM_WB_buffer {
     bool mem_to_reg;
     bool jump;
     bool jump_register;
-	uint32_t mem_write_data;
+	uint32_t mem_read_data;
 	uint32_t alu_result;
 	uint32_t write_reg_index;
 	bool interrupt;

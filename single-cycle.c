@@ -18,6 +18,8 @@
 
 #define DEBUG
 
+void showRegisterValues();
+
 int main( int argc, char *argv[] )
 {
 	FILE *f;
@@ -67,16 +69,14 @@ int main( int argc, char *argv[] )
 // 		printf("FETCH from PC=%x\n", cpu_ctx.PC);
 // #endif
 		printf("Start: \n");
-		printf("GPR[2]: %d\n", cpu_ctx.GPR[2]);
-		printf("GPR[4]: %d\n", cpu_ctx.GPR[4]);
+		showRegisterValues(cpu_ctx.GPR);
 		fetch( if_id );
 		decode( if_id, &id_ex );
 		execute( &id_ex, &ex_mem );
 		memory( &ex_mem, &mem_wb );
 		writeback( &mem_wb );
 		printf("End: \n");
-		printf("GPR[2]: %d\n", cpu_ctx.GPR[2]);
-		printf("GPR[4]: %d\n", cpu_ctx.GPR[4]);
+		showRegisterValues(cpu_ctx.GPR);
 		if ( cpu_ctx.PC == 0 ) {
 			break;
 		}
@@ -84,4 +84,16 @@ int main( int argc, char *argv[] )
 	}
 
 	return 0;
+}
+void showRegisterValues(int gpr[]) {
+	printf("GPR: [ ");
+	for(int i = 0; i < 32; i++) {
+		printf ("%d ", i);
+	}
+	printf("]\n");
+	printf("GPR: [ ");
+	for(int i = 0; i < 32; i++) {
+		printf ("%d ", gpr[i]);
+	}
+	printf("]\n");
 }
