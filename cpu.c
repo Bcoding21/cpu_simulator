@@ -29,13 +29,11 @@ int fetch(struct IF_ID_buffer *out )
 
 int decode( struct IF_ID_buffer *in, struct ID_EX_buffer *out )
 {
-	printf("decode\n");
 	short opcode = in->instruction >> 26; // gets bits 31:26
 	short funct = in->instruction & 0x3F; // gets bits 5:0
 
 	// TODO: move to setControlSignals
 	if (opcode == 0 && funct == 0xc && ((in->instruction & 0x3FFFFC0) == 0)) {  // check if it's a syscall
-		printf("decode/syscall\n");
 		cpu_ctx.interrupt= true;
 	} else {
 		cpu_ctx.interrupt = false;
@@ -78,27 +76,16 @@ int decode( struct IF_ID_buffer *in, struct ID_EX_buffer *out )
     out->reg_write = cpu_ctx.CNTRL.reg_write;
     out->jump_register = cpu_ctx.CNTRL.jump_register;
     out->jump_target_address = jump_target_address;
-
-		out->interrupt = cpu_ctx.interrupt;
+	out->interrupt = cpu_ctx.interrupt;
     out->opcode = opcode;
-
-    // debugging
-	printf("opcode: %d\n", out->opcode);
-	printf("read_data_1: %d\n", out->read_data_1);
-	printf("read_data_2: %d\n", out->read_data_2);
-	printf("funct: %d\n", out->funct);
 	return 0;
 }
 
 int execute( struct ID_EX_buffer *in, struct EX_MEM_buffer *out )
 {
     out->write_reg_index = MULTIPLEXOR(in->reg_dst, in->RD_index, in->RT_index); // Rg_Dst MUX with its inputs and selector
-		printf("execute\n");
-		printf("$v0:%d\n", cpu_ctx.GPR[2]);
-		printf("$a0:%d\n", cpu_ctx.GPR[4]);
 		// interrupt
 		if (in->interrupt) {
-			printf("execute/syscall\n");
 			syscall(2, cpu_ctx.GPR[2], cpu_ctx.GPR[4]);
 			out->pc_plus_4 = in->pc_plus_4;
 			return 0;
@@ -134,8 +121,7 @@ int execute( struct ID_EX_buffer *in, struct EX_MEM_buffer *out )
     out->branch_target = (in->immediate << 2) + in->pc_plus_4;
     out->jump_register = in->jump_register;
     out->jump_target_address = in->jump_target_address;
-		out->interrupt = cpu_ctx.interrupt;
-    printf("execute stage calculation result is: %d\n", out->alu_result);
+	out->interrupt = cpu_ctx.interrupt;
 
 	return 0;
 }
@@ -143,7 +129,6 @@ int execute( struct ID_EX_buffer *in, struct EX_MEM_buffer *out )
 int memory( struct EX_MEM_buffer *in, struct MEM_WB_buffer *out )
 {
 	if (in->interrupt) {
-		printf("memory/syscall\n");
 		return 0;
 	}
 	uint32_t write_address = in->alu_result;
@@ -167,19 +152,17 @@ int memory( struct EX_MEM_buffer *in, struct MEM_WB_buffer *out )
 	out->alu_result = in->alu_result;
 	out->write_reg_index = in->write_reg_index;
 	out->interrupt = cpu_ctx.interrupt;
+	out->jump = in->jump;
 	return 0;
 }
 
 int writeback( struct MEM_WB_buffer *in ){
 
 	if (in->interrupt) {
-		printf("memory/syscall\n");
 		return 0;
 	}
     in->write_reg_index = MULTIPLEXOR(in->jump, 31, in->write_reg_index);
 	if(in->reg_write) {
-		printf("writing to register %d, value   %d.\n", in->write_reg_index, in->alu_result);
-		//cpu_ctx.GPR[in->write_reg_index] = (in->mem_to_reg) ? in->mem_write_data : in->alu_result;
 		cpu_ctx.GPR[in->write_reg_index] = MULTIPLEXOR(in->mem_to_reg, in->mem_read_data, in->alu_result);
 
 	}
@@ -193,9 +176,7 @@ int instructionMemory(uint32_t address, struct IF_ID_buffer *out) {
 }
 
 int alu(struct ALU_INPUT* alu_input, struct ALU_OUTPUT* out){
-	printf("opcode in alu is: %d", alu_input->opcode);
 	if (alu_input->opcode == 0x00) { // R-format and syscall
-		// add instructions:
 		if (alu_input->funct == 0x20) { out->alu_result = alu_input->input_1 + alu_input->input_2; }				//add
 		else if(alu_input->funct == 0x24)  { out->alu_result = alu_input->input_1 & alu_input->input_2; }			//and
 		else if(alu_input->funct == 0x27)  { out->alu_result = ~(alu_input->input_1 | alu_input->input_2); }		//nor
@@ -207,9 +188,9 @@ int alu(struct ALU_INPUT* alu_input, struct ALU_OUTPUT* out){
 
         // Input casted to signed then shifted, then result is casted to unsigned to keep with out->alu_result type of uint32_t
 		else if (alu_input->funct == 0x03) {out->alu_result = (uint32_t) ((int32_t)alu_input->input_1 >> alu_input->shamt);} // sra
-
-		else if(alu_input->funct == 0x26)  { out->alu_result = alu_input->input_1 ^ alu_input->input_2;
-		printf("xoring %d with %d\n", alu_input->input_1, alu_input->input_2); }             // xor
+		else if(alu_input->funct == 0x26)  { 
+			out->alu_result = alu_input->input_1 ^ alu_input->input_2;												// xor
+		}   
 		// No operation need for jr
 
 		// FIX ME: Conditions for syscall maybe
@@ -222,8 +203,7 @@ int alu(struct ALU_INPUT* alu_input, struct ALU_OUTPUT* out){
 	}
 	// I format instructions.
 	else {
-		printf("doing i format\n");
-        if (alu_input->opcode == 0x08 ) {out->alu_result = alu_input->input_1 + alu_input->input_2; printf("doing addi with %d and %d\n", alu_input->input_1, alu_input->input_2 );}                        // addi
+        if (alu_input->opcode == 0x08 ) {out->alu_result = alu_input->input_1 + alu_input->input_2; }                        // addi
         else if (alu_input->opcode == 0x0C ) {out->alu_result = alu_input->input_1 & alu_input->input_2;}                   // andi
         else if (alu_input->opcode == 0x0F ) {out->alu_result = (alu_input->input_2 << 16);}                                // lui
         else if (alu_input->opcode == 0x0D ) {out->alu_result = alu_input->input_1 | alu_input->input_2;}                   // ori

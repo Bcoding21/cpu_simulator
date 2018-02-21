@@ -32,7 +32,7 @@ int main( int argc, char *argv[] )
 
 	/* Initialize registers and memory to 0 */
 	for ( i = 0; i < 32; i++ ) {
-		cpu_ctx.GPR[i] = i;
+		cpu_ctx.GPR[i] = 0;
 	}
 
 	for ( i = 0; i < 1024; i++ ) {
@@ -41,7 +41,6 @@ int main( int argc, char *argv[] )
 		stack_memory[i] = 0;
 	}
 
-    //const char* file = "example-text.txt";
     const char* file = argv[1];
 	/* Read memory from the input file */
 	f = fopen(file, "r");
@@ -49,13 +48,13 @@ int main( int argc, char *argv[] )
 		printf("File not found");
 	}
 	assert (f);
-	for ( i = 0; i < 0; i++ ) {
+	for ( i = 0; i < 4; i++ ) {		//	only 4 words of data are read in because the programs we use to test only have 4 words of data. We'll switch to 1024 finally.
 		fread(&data_memory[i], sizeof(uint32_t), 1, f);
 #if defined(DEBUG)
 		printf("%u\n", data_memory[i]);
 #endif
 	}
-	for ( i = 0; i < 36; i++ ) {
+	for ( i = 0; i < 8; i++ ) {		//	only 8 instructions are read in because the programs we use to test only have 4 instruction. We'll switch to 1024 finally.
 		fread(&instruction_memory[i], sizeof(uint32_t), 1, f);
 #if defined(DEBUG)
 		printf("%u\n", instruction_memory[i]);
@@ -64,18 +63,15 @@ int main( int argc, char *argv[] )
 	fclose(f);
 	int count = 0;
 
-	while(count < 14) {
-// #if defined(DEBUG)
-// 		printf("FETCH from PC=%x\n", cpu_ctx.PC);
-// #endif
-		printf("Start: \n");
-		showRegisterValues(cpu_ctx.GPR);
+	while(1) {
+#if defined(DEBUG)
+		printf("FETCH from PC=%x\n", cpu_ctx.PC);
+#endif
 		fetch( if_id );
 		decode( if_id, &id_ex );
 		execute( &id_ex, &ex_mem );
 		memory( &ex_mem, &mem_wb );
 		writeback( &mem_wb );
-		printf("End: \n");
 		showRegisterValues(cpu_ctx.GPR);
 		if ( cpu_ctx.PC == 0 ) {
 			break;
@@ -85,6 +81,7 @@ int main( int argc, char *argv[] )
 
 	return 0;
 }
+// This function displays the values in the GPR array. We use this for debugging purposes really.
 void showRegisterValues(int gpr[]) {
 	printf("GPR: [ ");
 	for(int i = 0; i < 32; i++) {
