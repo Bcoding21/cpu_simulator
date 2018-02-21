@@ -64,7 +64,7 @@ int main( int argc, char *argv[] )
 	fclose(f);
 	int count = 0;
 
-	while(count < 4) {
+	while(count < 14) {
 // #if defined(DEBUG)
 // 		printf("FETCH from PC=%x\n", cpu_ctx.PC);
 // #endif

@@ -12,6 +12,7 @@
 #include "memory.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include "syscall.h"
 int instructionMemory(uint32_t address, struct IF_ID_buffer *out);
 int registerFile(struct REG_FILE_input* input, struct REG_FILE_output* output);
 int alu(struct ALU_INPUT* alu_input, struct ALU_OUTPUT* out);
@@ -28,12 +29,21 @@ int fetch(struct IF_ID_buffer *out )
 
 int decode( struct IF_ID_buffer *in, struct ID_EX_buffer *out )
 {
+	printf("decode\n");
 	short opcode = in->instruction >> 26; // gets bits 31:26
 	short funct = in->instruction & 0x3F; // gets bits 5:0
+
+	// TODO: move to setControlSignals
+	if (opcode == 0 && funct == 0xc && ((in->instruction & 0x3FFFFC0) == 0)) {  // check if it's a syscall
+		printf("decode/syscall\n");
+		cpu_ctx.interrupt= true;
+	} else {
+		cpu_ctx.interrupt = false;
+	}
+
 	short shamt = (in->instruction >> 6) & 0x1F; // gets bits 10:6
 
 	setControlSignals(opcode, funct); // set the control signals
-
     uint32_t RS_index = (in->instruction >> 21) & 0x1F; // get bits 25:21 (rs)
     uint32_t RT_index = (in->instruction >> 16) & 0x1F; // get bits 20:16(rt)
     uint32_t RD_index = (in->instruction >> 11) & 0x1F; // get bits 15:11(rd)
@@ -68,6 +78,8 @@ int decode( struct IF_ID_buffer *in, struct ID_EX_buffer *out )
     out->reg_write = cpu_ctx.CNTRL.reg_write;
     out->jump_register = cpu_ctx.CNTRL.jump_register;
     out->jump_target_address = jump_target_address;
+
+		out->interrupt = cpu_ctx.interrupt;
     out->opcode = opcode;
 
     // debugging
@@ -80,8 +92,18 @@ int decode( struct IF_ID_buffer *in, struct ID_EX_buffer *out )
 
 int execute( struct ID_EX_buffer *in, struct EX_MEM_buffer *out )
 {
-
     out->write_reg_index = MULTIPLEXOR(in->reg_dst, in->RD_index, in->RT_index); // Rg_Dst MUX with its inputs and selector
+		printf("execute\n");
+		printf("$v0:%d\n", cpu_ctx.GPR[2]);
+		printf("$a0:%d\n", cpu_ctx.GPR[4]);
+		// interrupt
+		if (in->interrupt) {
+			printf("execute/syscall\n");
+			syscall(2, cpu_ctx.GPR[2], cpu_ctx.GPR[4]);
+			out->pc_plus_4 = in->pc_plus_4;
+			return 0;
+		}
+
 
     struct ALU_INPUT* alu_input = (struct ALU_INPUT*) malloc(sizeof(struct ALU_INPUT)); // holds inputs
     struct ALU_OUTPUT* alu_output = (struct ALU_OUTPUT*) malloc(sizeof(struct ALU_OUTPUT)); // hold outputs
@@ -112,6 +134,7 @@ int execute( struct ID_EX_buffer *in, struct EX_MEM_buffer *out )
     out->branch_target = (in->immediate << 2) + in->pc_plus_4;
     out->jump_register = in->jump_register;
     out->jump_target_address = in->jump_target_address;
+		out->interrupt = cpu_ctx.interrupt;
     printf("execute stage calculation result is: %d\n", out->alu_result);
 
 	return 0;
@@ -119,6 +142,10 @@ int execute( struct ID_EX_buffer *in, struct EX_MEM_buffer *out )
 
 int memory( struct EX_MEM_buffer *in, struct MEM_WB_buffer *out )
 {
+	if (in->interrupt) {
+		printf("memory/syscall\n");
+		return 0;
+	}
 	uint32_t write_address = in->alu_result;
 	uint32_t write_data = in->read_data_2;
 	if (in->mem_write) {
@@ -139,11 +166,16 @@ int memory( struct EX_MEM_buffer *in, struct MEM_WB_buffer *out )
 	out->mem_to_reg = in->mem_to_reg;
 	out->alu_result = in->alu_result;
 	out->write_reg_index = in->write_reg_index;
+	out->interrupt = cpu_ctx.interrupt;
 	return 0;
 }
 
 int writeback( struct MEM_WB_buffer *in ){
 
+	if (in->interrupt) {
+		printf("memory/syscall\n");
+		return 0;
+	}
     in->write_reg_index = MULTIPLEXOR(in->jump, 31, in->write_reg_index);
 	if(in->reg_write) {
 		printf("writing to register %d, value   %d.\n", in->write_reg_index, in->alu_result);

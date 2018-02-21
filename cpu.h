@@ -39,6 +39,9 @@ struct cpu_context {
 	uint32_t PC;
 	uint32_t GPR[32];
 	struct Control CNTRL;
+	bool interrupt;
+
+
 };
 
 extern struct cpu_context cpu_ctx;
@@ -63,6 +66,7 @@ struct ID_EX_buffer {
 	short funct, opcode, shamt;
 	uint32_t read_data_1, read_data_2, immediate;
 	uint32_t RS_index, RT_index, RD_index;      // RS_index is needed in the executed stage for forwarding for data hazards
+	bool interrupt;
 };
 
 struct EX_MEM_buffer {
@@ -80,6 +84,7 @@ struct EX_MEM_buffer {
 	uint32_t pc_plus_4;
 	uint32_t jump_target_address;
 	uint32_t read_data_2;
+	bool interrupt;
 };
 
 struct MEM_WB_buffer {
@@ -90,6 +95,7 @@ struct MEM_WB_buffer {
 	uint32_t mem_read_data;
 	uint32_t alu_result;
 	uint32_t write_reg_index;
+	bool interrupt;
 	//	reg_write_data and alu_result_data have to both be present for the WB stage to decide whether to wuse
 	// data from memory or alu result based on mem_to_reg value when writin gto register
 };
@@ -152,4 +158,3 @@ int alu(struct ALU_INPUT* in, struct ALU_OUTPUT* out);
 int setControlState(short);
 void setInstructionFormat(short);
 void setMultiplexors();
-
