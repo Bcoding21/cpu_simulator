@@ -169,6 +169,25 @@ int writeback( struct MEM_WB_buffer *in ){
 	return 0;
 }
 
+// this function checks to see if a block referred to in the 
+// det associative data memory cache is valid
+bool sCacheBlockValid(uint32_t addr) {
+	// need to determine block to which required word belongs
+	// then we determine the cache for that block
+	// the address of the block will be:
+	uint32_t block_addr = (addr >> 4) << 4;
+	uint32_t block_tag = addr >> 9;
+	int setIndex = (block_addr >> 4) % 128;
+	struct Set requiredSet = sCache[setIndex];
+	for(int i = 0; i < 4; i++){
+        temp_block = requiredSet.block_array[i];
+        if (temp_block.tag == (block_tag) && temp_block.valid) {
+			return true;
+		}
+	}
+	return false;
+}
+
 int instructionMemory(uint32_t address, struct IF_ID_buffer *out) {
 	out->instruction = instruction_memory[address - 0x400000];
 	// printf("Instruction got: %d\n", out->instruction);

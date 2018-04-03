@@ -40,11 +40,22 @@ struct cpu_context {
 	uint32_t GPR[32];
 	struct Control CNTRL;
 	bool interrupt;
-
-
 };
 
+// block is used to mean each row
+// the data field is the block content of each row
+struct Block {
+	uint32_t data[4];		//each block should contain 4 words
+	int tag;
+	bool valid;
+};
+
+struct Set {
+	struct Block block_array[4];
+}
+
 extern struct cpu_context cpu_ctx;
+extern struct Set sCache[32];
 
 struct IF_ID_buffer {
 	uint32_t instruction;
