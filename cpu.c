@@ -19,6 +19,7 @@ int alu(struct ALU_INPUT* alu_input, struct ALU_OUTPUT* out);
 int setControlSignals(short opcode, short funct);
 
 struct cpu_context cpu_ctx;
+struct Set sCache[32];
 
 int fetch(struct IF_ID_buffer *out )
 {
@@ -175,12 +176,12 @@ bool sCacheBlockValid(uint32_t addr) {
 	// need to determine block to which required word belongs
 	// then we determine the cache for that block
 	// the address of the block will be:
-	uint32_t block_addr = (addr >> 4) << 4;
-	uint32_t block_tag = addr >> 9;
-	int setIndex = (block_addr >> 4) % 128;
+	uint32_t block_addr = addr >> 4;
+	uint32_t block_tag = addr >> 7;
+	int setIndex = block_addr % 32;
 	struct Set requiredSet = sCache[setIndex];
 	for(int i = 0; i < 4; i++){
-        temp_block = requiredSet.block_array[i];
+        struct Block temp_block = requiredSet.block_array[i];
         if (temp_block.tag == (block_tag) && temp_block.valid) {
 			return true;
 		}

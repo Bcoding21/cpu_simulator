@@ -19,7 +19,6 @@
 #define DEBUG
 
 void showRegisterValues();
-
 int main( int argc, char *argv[] )
 {
 	FILE *f;
@@ -29,7 +28,7 @@ int main( int argc, char *argv[] )
 	struct MEM_WB_buffer mem_wb;
 	int i;
 	cpu_ctx.PC = 0x00400000;
-
+	
 	/* Initialize registers and memory to 0 */
 	for ( i = 0; i < 32; i++ ) {
 		cpu_ctx.GPR[i] = 0;

@@ -52,9 +52,11 @@ struct Block {
 
 struct Set {
 	struct Block block_array[4];
-}
+};
 
 extern struct cpu_context cpu_ctx;
+
+// will change name to l1_data_cache
 extern struct Set sCache[32];
 
 struct IF_ID_buffer {
