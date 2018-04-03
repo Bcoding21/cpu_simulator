@@ -57,7 +57,7 @@ struct Set {
 extern struct cpu_context cpu_ctx;
 
 // will change name to l1_data_cache
-extern struct Set sCache[32];
+extern struct Set l1_data_cache[32];
 
 struct IF_ID_buffer {
 	uint32_t instruction;

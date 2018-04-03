@@ -19,7 +19,7 @@ int alu(struct ALU_INPUT* alu_input, struct ALU_OUTPUT* out);
 int setControlSignals(short opcode, short funct);
 
 struct cpu_context cpu_ctx;
-struct Set sCache[32];
+struct Set l1_data_cache[32];
 
 int fetch(struct IF_ID_buffer *out )
 {
@@ -172,14 +172,15 @@ int writeback( struct MEM_WB_buffer *in ){
 
 // this function checks to see if a block referred to in the 
 // det associative data memory cache is valid
-bool sCacheBlockValid(uint32_t addr) {
+// parameter addr is the address of the WORD (NOT BLOCK requested)
+bool l1_data_cache_BlockValid(uint32_t addr) {
 	// need to determine block to which required word belongs
 	// then we determine the cache for that block
 	// the address of the block will be:
 	uint32_t block_addr = addr >> 4;
 	uint32_t block_tag = addr >> 7;
 	int setIndex = block_addr % 32;
-	struct Set requiredSet = sCache[setIndex];
+	struct Set requiredSet = l1_data_cache[setIndex];
 	for(int i = 0; i < 4; i++){
         struct Block temp_block = requiredSet.block_array[i];
         if (temp_block.tag == (block_tag) && temp_block.valid) {
@@ -187,6 +188,27 @@ bool sCacheBlockValid(uint32_t addr) {
 		}
 	}
 	return false;
+}
+
+// this function returns a block referred to by addr in the 
+// det associative data memory cache is 
+// parameter addr is the address of the WORD (NOT BLOCK requested)
+// it returns on ly the word at the requested address (addr) not the entire block
+uint32_t readBlockFromDataCache(uint32_t addr) {
+	uint32_t block_addr = addr >> 4;
+	uint32_t block_tag = addr >> 7;
+	int setIndex = block_addr % 32;
+	struct Set requiredSet = l1_data_cache[setIndex];
+	int byte_offset = addr - (block_addr << 4);
+	struct Block required_block;
+
+	for (int i = 0; i < 4; i++) {
+		if(requiredSet.block_array[i].tag == block_tag) {
+			required_block = requiredSet.block_array[i];
+		}
+	}
+
+	return required_block.data[byte_offset];
 }
 
 int instructionMemory(uint32_t address, struct IF_ID_buffer *out) {
