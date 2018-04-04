@@ -17,7 +17,6 @@ int instructionMemory(uint32_t address, struct IF_ID_buffer *out);
 int registerFile(struct REG_FILE_input* input, struct REG_FILE_output* output);
 int alu(struct ALU_INPUT* alu_input, struct ALU_OUTPUT* out);
 int setControlSignals(short opcode, short funct);
-bool l1_data_cache_BlockValid(uint32_t addr);
 uint32_t readWordFromDataCache(uint32_t addr);
 
 struct cpu_context cpu_ctx;
@@ -176,26 +175,6 @@ int writeback( struct MEM_WB_buffer *in ){
 	return 0;
 }
 
-// this function checks to see if a block referred to in the 
-// det associative data memory cache is valid
-// parameter addr is the address of the WORD (NOT BLOCK requested)
-bool l1_data_cache_BlockValid(uint32_t addr) {
-	// need to determine block to which required word belongs
-	// then we determine the cache for that block
-	// the address of the block will be:
-	uint32_t block_addr = addr >> 4;
-	uint32_t block_tag = addr >> 7;
-	int setIndex = block_addr % 32;
-	struct Set requiredSet = l1_data_cache[setIndex];
-	for(int i = 0; i < 4; i++){
-		struct Block temp_block = requiredSet.block_array[i];
-		if (temp_block.tag == (block_tag) && temp_block.valid) {
-			return true;
-		}
-	}
-	return false;
-}
-
 // this function returns a block referred to by addr in the 
 // det associative data memory cache is 
 // parameter addr is the address of the WORD (NOT BLOCK requested)
@@ -205,57 +184,78 @@ uint32_t readWordFromDataCache(uint32_t addr) {
 	uint32_t block_tag = addr >> 7;			// get most significant 25 bits of address for tag
 	int setIndex = block_addr % 32;			// get index for set
 	struct Set requiredSet = l1_data_cache[setIndex];	//obtain required set
-	int byte_offset = addr - (block_addr << 4);			//get byte offset for particular word
+	int byte_offset = (addr - (block_addr << 4)) / 4;	//get byte offset for particular word
 	struct Block required_block;
 
 	int required_block_index;
 	bool found_and_valid = false;
 	for (int i = 0; i < 4; i++) {
 		if(requiredSet.block_array[i].tag == block_tag && requiredSet.block_array[i].valid) {
+			//handle read hit
 			required_block = requiredSet.block_array[i];
 			found_and_valid = true;
 
 			// update lru_states (only states less than former state of new mru need to be increased)
-			int former_lru_state = requiredSet.lru_states[i];
+			int former_lru_state = requiredSet.lru_states[i]; // this is the formaer LRU state of the block that's being read
 			requiredSet.lru_states[i] = 0;
-			for (int j = 0; j < 4; j++){
-				if (requiredSet.lru_states[j] < former_lru_state) { requiredSet.lru_states[j]++;		}
+			for (int j = 0; j < requiredSet.fill_extent; j++){
+				if (i != j && requiredSet.lru_states[j] < former_lru_state) { requiredSet.lru_states[j]++;		}
 			}
 		}
 	}
 
 	//handle read miss
-	//need to implement logic to:
+	//need to implement logic to: (lol not done in specified order)
 	//1. get block from memory
 	//2. decide which block to evict
 	//3. replace blocks that needs to be evicted
 	//4. update lru state
 	if(!found_and_valid) {
-		cpu_ctx.stall_count += 4; //need to increase stall count
-		int index_of_lru_block = 0;
-		for (int i = 0; i < 4; i++) {
-			//get the index of the block with the highest LRU state which 
-			index_of_lru_block = requiredSet.lru_states[i] > requiredSet.lru_states[index_of_lru_block] ? i : index_of_lru_block;
-		}
-		int raw_data_mem_array_index = ((block_addr << 4) - 0x10000000) / 4;
-		//create new block form data memory
-		struct Block required_block;
-		required_block.data[0] = data_memory[raw_data_mem_array_index];
-		required_block.data[1] = data_memory[raw_data_mem_array_index + 1];
-		required_block.data[2] = data_memory[raw_data_mem_array_index + 2];
-		required_block.data[3] = data_memory[raw_data_mem_array_index + 3];
-		required_block.valid = true;
-		required_block.tag = block_tag;
-		
-		//lru block will be replaced and so will become the MRU, so it'll have a state of 0
-		requiredSet.lru_states[index_of_lru_block] = 0;
-		requiredSet.block_array[index_of_lru_block] = required_block;
-		for (int i = 0; i < 4; i++) {
-			if (i != index_of_lru_block) { requiredSet.lru_states[i]++; }
-		}
+		//only do eviction if we have four blocks
+		if(requiredSet.fill_extent == 4 ) {
+			cpu_ctx.stall_count += 4; //need to increase stall count
+			int index_of_lru_block = 0;
+			for (int i = 0; i < 4; i++) {
+				//get the index of the block with the highest LRU state which 
+				index_of_lru_block = requiredSet.lru_states[i] > requiredSet.lru_states[index_of_lru_block] ? i : index_of_lru_block;
+			}
+			int raw_data_mem_array_index = ((block_addr << 4) - 0x10000000) / 4;
+			//create new block form data memory
+			required_block.data[0] = data_memory[raw_data_mem_array_index];
+			required_block.data[1] = data_memory[raw_data_mem_array_index + 1];
+			required_block.data[2] = data_memory[raw_data_mem_array_index + 2];
+			required_block.data[3] = data_memory[raw_data_mem_array_index + 3];
+			required_block.valid = true;
+			required_block.tag = block_tag;
 
+			//lru block will be replaced and so will become the MRU, so it'll have a state of 0
+			requiredSet.lru_states[index_of_lru_block] = 0;
+			requiredSet.block_array[index_of_lru_block] = required_block;
+			for (int i = 0; i < 4; i++) {
+				if (i != index_of_lru_block) { requiredSet.lru_states[i]++; }
+			}
+		} else {
+			//handle compulsory misses (when miss occurs because set is not full)
+			int index_of_lru_block = 0;
+			for (int i = 0; i < requiredSet.fill_extent; i++) {
+				//get the index of the block with the highest LRU state which 
+				index_of_lru_block = requiredSet.lru_states[i] > requiredSet.lru_states[index_of_lru_block] ? i : index_of_lru_block;
+			}
+			requiredSet.fill_extent += 1;
+			int raw_data_mem_array_index = ((block_addr << 4) - 0x10000000) / 4;
+			//create new block form data memory
+			required_block.data[0] = data_memory[raw_data_mem_array_index];
+			required_block.data[1] = data_memory[raw_data_mem_array_index + 1];
+			required_block.data[2] = data_memory[raw_data_mem_array_index + 2];
+			required_block.data[3] = data_memory[raw_data_mem_array_index + 3];
+			required_block.valid = true;
+			required_block.tag = block_tag;
+			requiredSet.block_array[requiredSet.fill_extent] = required_block;
+			for (int i = 0; i < requiredSet.fill_extent; i++) {
+				if (i != index_of_lru_block) { requiredSet.lru_states[i]++; }
+			}	
+		}
 	}
-
 	return required_block.data[byte_offset];
 }
 

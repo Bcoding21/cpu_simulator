@@ -54,7 +54,8 @@ struct Block {
 struct Set {
 	struct Block block_array[4];
 	int lru_states[4];
-	//convention for LRU determination 0 - MRU... 3 - LRU
+	int fill_extent;// to handl einitial phase of compulsory misses
+	//convention for LRU determination 0 -> MRU... 3 -> LRU
 };
 
 extern struct cpu_context cpu_ctx;
