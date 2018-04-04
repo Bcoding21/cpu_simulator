@@ -15,7 +15,7 @@
 - Daniel - Implement instruction cache structure
 - David - write read logic - set associative
 - Michaun - write read logic - direct mapped
-- Temilola - write write logic - direct-mapped, set-associative
+- Temilola - write write logic - set-associative
 
 ## Notes From Team Meetings
 ![Image](https://i.imgur.com/H6l7ekG.jpg)
