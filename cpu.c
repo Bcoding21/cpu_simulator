@@ -17,6 +17,8 @@ int instructionMemory(uint32_t address, struct IF_ID_buffer *out);
 int registerFile(struct REG_FILE_input* input, struct REG_FILE_output* output);
 int alu(struct ALU_INPUT* alu_input, struct ALU_OUTPUT* out);
 int setControlSignals(short opcode, short funct);
+bool l1_data_cache_BlockValid(uint32_t addr);
+uint32_t readWordFromDataCache(uint32_t addr);
 
 struct cpu_context cpu_ctx;
 struct Set l1_data_cache[32];
@@ -36,9 +38,9 @@ int decode( struct IF_ID_buffer *in, struct ID_EX_buffer *out )
 	// TODO: move to setControlSignals
 	if (opcode == 0 && funct == 0xc && ((in->instruction & 0x3FFFFC0) == 0)) {  // check if it's a syscall
 		cpu_ctx.interrupt= true;
-	} else {
-		cpu_ctx.interrupt = false;
-	}
+} else {
+	cpu_ctx.interrupt = false;
+}
 
 	short shamt = (in->instruction >> 6) & 0x1F; // gets bits 10:6
 
@@ -59,8 +61,8 @@ int decode( struct IF_ID_buffer *in, struct ID_EX_buffer *out )
     out->immediate = (in->instruction & 0x8000) == 0 ? in->instruction & 0xFFFF : in->instruction & 0xFFFF0000; // 15:0  address
  	out->funct = funct; // bits 5:0 funct
 
-    out->shamt = shamt;
-    out->pc_plus_4 = in->pc_plus_4;
+ 	out->shamt = shamt;
+ 	out->pc_plus_4 = in->pc_plus_4;
 
     out->RS_index = RS_index; // Not used yet. Will be used in conjunction with forwarding unit when pipelining for data hazards
 
@@ -77,20 +79,20 @@ int decode( struct IF_ID_buffer *in, struct ID_EX_buffer *out )
     out->reg_write = cpu_ctx.CNTRL.reg_write;
     out->jump_register = cpu_ctx.CNTRL.jump_register;
     out->jump_target_address = jump_target_address;
-	out->interrupt = cpu_ctx.interrupt;
+    out->interrupt = cpu_ctx.interrupt;
     out->opcode = opcode;
-	return 0;
+    return 0;
 }
 
 int execute( struct ID_EX_buffer *in, struct EX_MEM_buffer *out )
 {
     out->write_reg_index = MULTIPLEXOR(in->reg_dst, in->RD_index, in->RT_index); // Rg_Dst MUX with its inputs and selector
 		// interrupt
-		if (in->interrupt) {
-			syscall(2, cpu_ctx.GPR[2], cpu_ctx.GPR[4]);
-			out->pc_plus_4 = in->pc_plus_4;
-			return 0;
-		}
+    if (in->interrupt) {
+    	syscall(2, cpu_ctx.GPR[2], cpu_ctx.GPR[4]);
+    	out->pc_plus_4 = in->pc_plus_4;
+    	return 0;
+    }
 
 
     struct ALU_INPUT* alu_input = (struct ALU_INPUT*) malloc(sizeof(struct ALU_INPUT)); // holds inputs
@@ -103,9 +105,9 @@ int execute( struct ID_EX_buffer *in, struct EX_MEM_buffer *out )
     alu_input->input_2 = MULTIPLEXOR(in->jump, 0, alu_src_mux_output);
 
     // alu_input will take funct, opcode and shamt
-	alu_input->funct = in->funct;
-	alu_input->opcode = in->opcode;
-	alu_input->shamt = in->shamt;
+    alu_input->funct = in->funct;
+    alu_input->opcode = in->opcode;
+    alu_input->shamt = in->shamt;
     alu(alu_input, alu_output);
 
     // pass alu results
@@ -122,9 +124,9 @@ int execute( struct ID_EX_buffer *in, struct EX_MEM_buffer *out )
     out->branch_target = (in->immediate << 2) + in->pc_plus_4;
     out->jump_register = in->jump_register;
     out->jump_target_address = in->jump_target_address;
-	out->interrupt = cpu_ctx.interrupt;
+    out->interrupt = cpu_ctx.interrupt;
 
-	return 0;
+    return 0;
 }
 
 int memory( struct EX_MEM_buffer *in, struct MEM_WB_buffer *out )
@@ -148,6 +150,10 @@ int memory( struct EX_MEM_buffer *in, struct MEM_WB_buffer *out )
 	out->reg_write = in->reg_write;
 	if (in->mem_read) {
 		out->mem_read_data = data_memory[write_address - 0x10000000];
+		#if defined(ENABLE_L1_CACHES)
+		printf("Using cache for memory read operation.\n");
+		out->mem_read_data = readWordFromDataCache(write_address);
+		#endif
 	}
 	out->mem_to_reg = in->mem_to_reg;
 	out->alu_result = in->alu_result;
@@ -162,7 +168,7 @@ int writeback( struct MEM_WB_buffer *in ){
 	if (in->interrupt) {
 		return 0;
 	}
-    in->write_reg_index = MULTIPLEXOR(in->jump, 31, in->write_reg_index);
+	in->write_reg_index = MULTIPLEXOR(in->jump, 31, in->write_reg_index);
 	if(in->reg_write) {
 		cpu_ctx.GPR[in->write_reg_index] = MULTIPLEXOR(in->mem_to_reg, in->mem_read_data, in->alu_result);
 
@@ -182,8 +188,8 @@ bool l1_data_cache_BlockValid(uint32_t addr) {
 	int setIndex = block_addr % 32;
 	struct Set requiredSet = l1_data_cache[setIndex];
 	for(int i = 0; i < 4; i++){
-        struct Block temp_block = requiredSet.block_array[i];
-        if (temp_block.tag == (block_tag) && temp_block.valid) {
+		struct Block temp_block = requiredSet.block_array[i];
+		if (temp_block.tag == (block_tag) && temp_block.valid) {
 			return true;
 		}
 	}
@@ -194,18 +200,60 @@ bool l1_data_cache_BlockValid(uint32_t addr) {
 // det associative data memory cache is 
 // parameter addr is the address of the WORD (NOT BLOCK requested)
 // it returns on ly the word at the requested address (addr) not the entire block
-uint32_t readBlockFromDataCache(uint32_t addr) {
-	uint32_t block_addr = addr >> 4;
-	uint32_t block_tag = addr >> 7;
-	int setIndex = block_addr % 32;
-	struct Set requiredSet = l1_data_cache[setIndex];
-	int byte_offset = addr - (block_addr << 4);
+uint32_t readWordFromDataCache(uint32_t addr) {
+	uint32_t block_addr = addr >> 4;		// block address = memory address / size of block (16)
+	uint32_t block_tag = addr >> 7;			// get most significant 25 bits of address for tag
+	int setIndex = block_addr % 32;			// get index for set
+	struct Set requiredSet = l1_data_cache[setIndex];	//obtain required set
+	int byte_offset = addr - (block_addr << 4);			//get byte offset for particular word
 	struct Block required_block;
 
+	int required_block_index;
+	bool found_and_valid = false;
 	for (int i = 0; i < 4; i++) {
-		if(requiredSet.block_array[i].tag == block_tag) {
+		if(requiredSet.block_array[i].tag == block_tag && requiredSet.block_array[i].valid) {
 			required_block = requiredSet.block_array[i];
+			found_and_valid = true;
+
+			// update lru_states (only states less than former state of new mru need to be increased)
+			int former_lru_state = requiredSet.lru_states[i];
+			requiredSet.lru_states[i] = 0;
+			for (int j = 0; j < 4; j++){
+				if (requiredSet.lru_states[j] < former_lru_state) { requiredSet.lru_states[j]++;		}
+			}
 		}
+	}
+
+	//handle read miss
+	//need to implement logic to:
+	//1. get block from memory
+	//2. decide which block to evict
+	//3. replace blocks that needs to be evicted
+	//4. update lru state
+	if(!found_and_valid) {
+		cpu_ctx.stall_count += 4; //need to increase stall count
+		int index_of_lru_block = 0;
+		for (int i = 0; i < 4; i++) {
+			//get the index of the block with the highest LRU state which 
+			index_of_lru_block = requiredSet.lru_states[i] > requiredSet.lru_states[index_of_lru_block] ? i : index_of_lru_block;
+		}
+		int raw_data_mem_array_index = ((block_addr << 4) - 0x10000000) / 4;
+		//create new block form data memory
+		struct Block required_block;
+		required_block.data[0] = data_memory[raw_data_mem_array_index];
+		required_block.data[1] = data_memory[raw_data_mem_array_index + 1];
+		required_block.data[2] = data_memory[raw_data_mem_array_index + 2];
+		required_block.data[3] = data_memory[raw_data_mem_array_index + 3];
+		required_block.valid = true;
+		required_block.tag = block_tag;
+		
+		//lru block will be replaced and so will become the MRU, so it'll have a state of 0
+		requiredSet.lru_states[index_of_lru_block] = 0;
+		requiredSet.block_array[index_of_lru_block] = required_block;
+		for (int i = 0; i < 4; i++) {
+			if (i != index_of_lru_block) { requiredSet.lru_states[i]++; }
+		}
+
 	}
 
 	return required_block.data[byte_offset];
@@ -258,9 +306,9 @@ int alu(struct ALU_INPUT* alu_input, struct ALU_OUTPUT* out){
         else if (alu_input->opcode == 0x23 ) {out->alu_result = alu_input->input_1 + alu_input->input_2;}                   // lw
         else if (alu_input->opcode == 0x2B ) {out->alu_result = alu_input->input_1 + alu_input->input_2;}                   // sw
 
-	}
+    }
 
-	return 0;
+    return 0;
 }
 
 int setControlSignals(short opcode, short funct) { // sets control signal outputs
@@ -341,12 +389,12 @@ int setControlSignals(short opcode, short funct) { // sets control signal output
 uint32_t MULTIPLEXOR(bool selector, uint32_t HIGH_INPUT, uint32_t LOW_INPUT){
     // Function takes in 2 unsigned 32 bit value, if the selector is True we return the HIGH_INPUT
     // else we return the LOW_INPUT because the selector is definitely false.
-    uint32_t result_val;
+	uint32_t result_val;
     if (selector){                  //
-        result_val = HIGH_INPUT;
+    	result_val = HIGH_INPUT;
     }
     else{
-        result_val = LOW_INPUT;
+    	result_val = LOW_INPUT;
     }
 
     return result_val;
