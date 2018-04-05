@@ -32,6 +32,7 @@ int main( int argc, char *argv[] )
 	/* Initialize registers and memory to 0 */
 	for ( i = 0; i < 32; i++ ) {
 		cpu_ctx.GPR[i] = 0;
+		l1_data_cache[32].fill_extent = 0;
 	}
 
 	for ( i = 0; i < 1024; i++ ) {
@@ -47,16 +48,17 @@ int main( int argc, char *argv[] )
 		printf("File not found");
 	}
 	assert (f);
+	for ( i = 0; i < 12; i++ ) {		//	only 12 instructions are read in because the programs we use to test only have 4 instruction. We'll switch to 1024 finally.
+		fread(&instruction_memory[i], sizeof(uint32_t), 1, f);
+#if defined(DEBUG)
+		printf("i:%x\n", instruction_memory[i]);
+#endif
+	}
+
 	for ( i = 0; i < 4; i++ ) {		//	only 4 words of data are read in because the programs we use to test only have 4 words of data. We'll switch to 1024 finally.
 		fread(&data_memory[i], sizeof(uint32_t), 1, f);
 #if defined(DEBUG)
-		printf("%u\n", data_memory[i]);
-#endif
-	}
-	for ( i = 0; i < 8; i++ ) {		//	only 8 instructions are read in because the programs we use to test only have 4 instruction. We'll switch to 1024 finally.
-		fread(&instruction_memory[i], sizeof(uint32_t), 1, f);
-#if defined(DEBUG)
-		printf("%u\n", instruction_memory[i]);
+		printf("d:%x\n", data_memory[i]);
 #endif
 	}
 	fclose(f);
@@ -66,6 +68,10 @@ int main( int argc, char *argv[] )
 #if defined(DEBUG)
 		printf("FETCH from PC=%x\n", cpu_ctx.PC);
 #endif
+		printf("press Enter to run next cycle.\n");
+		char c[2];
+		fgets(c, sizeof c, stdin);
+
 		fetch( if_id );
 		decode( if_id, &id_ex );
 		execute( &id_ex, &ex_mem );
@@ -75,6 +81,7 @@ int main( int argc, char *argv[] )
 		if ( cpu_ctx.PC == 0 ) {
 			break;
 		}
+		printf("%i\n", count);
 		count++;
 	}
 

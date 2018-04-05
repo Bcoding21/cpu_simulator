@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
+#include <string.h>
 
 #define DEBUG
 
@@ -33,6 +34,7 @@ static void read_and_write(FILE *in, FILE *out, size_t count)
 		fwrite(&val, sizeof(uint32_t), 1, out);
 		i++;
 	}
+	printf("i: %d,\ncount: %zd\n", i, count);
 	assert( i <= count );
 
 	val = 0;
@@ -69,8 +71,8 @@ int main( int argc, char *argv[] )
 	assert(data);
 	assert(output);
 
-	read_and_write(text, output, 1024);
-	read_and_write(data, output, 1024);
+	read_and_write(text, output, 12);
+	read_and_write(data, output, 4);
 
 	fclose(text);
 	fclose(data);

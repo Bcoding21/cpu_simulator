@@ -25,7 +25,7 @@ struct Set l1_data_cache[32];
 int fetch(struct IF_ID_buffer *out )
 {
 	instructionMemory(cpu_ctx.PC, out);
-	out->pc_plus_4 = cpu_ctx.PC + 1;
+	out->pc_plus_4 = cpu_ctx.PC + 4;
 	return 0;
 }
 
@@ -120,7 +120,9 @@ int execute( struct ID_EX_buffer *in, struct EX_MEM_buffer *out )
     out->mem_write = in->mem_write;
     out->mem_to_reg = in->mem_to_reg;
     out->pc_plus_4 = in->pc_plus_4;
-    out->branch_target = (in->immediate << 2) + in->pc_plus_4;
+    // I subtract here because I have reason to believe qtspim calculates offset from pc + 4 and not from pc
+    // subject to the label being ona line of its own
+    out->branch_target = ((in->immediate - 1) << 2) + in->pc_plus_4;
     out->jump_register = in->jump_register;
     out->jump_target_address = in->jump_target_address;
     out->interrupt = cpu_ctx.interrupt;
@@ -136,7 +138,7 @@ int memory( struct EX_MEM_buffer *in, struct MEM_WB_buffer *out )
 	uint32_t write_address = in->alu_result;
 	uint32_t write_data = in->read_data_2;
 	if (in->mem_write) {
-		data_memory[write_address - 0x10000000] = write_data;
+		data_memory[(write_address - 0x10000000) / 4] = write_data;
 	}
 
 	//fake implementation of PCSrc signal and MUX
@@ -169,8 +171,10 @@ int writeback( struct MEM_WB_buffer *in ){
 	}
 	in->write_reg_index = MULTIPLEXOR(in->jump, 31, in->write_reg_index);
 	if(in->reg_write) {
+		printf("in->mem_read_data: %d\n", in->mem_read_data);
+		printf("in->alu_result: %d\n", in->alu_result);
+		printf("writing value: %d to register", MULTIPLEXOR(in->mem_to_reg, in->mem_read_data, in->alu_result));
 		cpu_ctx.GPR[in->write_reg_index] = MULTIPLEXOR(in->mem_to_reg, in->mem_read_data, in->alu_result);
-
 	}
 	return 0;
 }
@@ -250,7 +254,7 @@ uint32_t readWordFromDataCache(uint32_t addr) {
 			required_block.data[3] = data_memory[raw_data_mem_array_index + 3];
 			required_block.valid = true;
 			required_block.tag = block_tag;
-			requiredSet.block_array[requiredSet.fill_extent] = required_block;
+			requiredSet.block_array[requiredSet.fill_extent - 1] = required_block;
 			for (int i = 0; i < requiredSet.fill_extent; i++) {
 				if (i != index_of_lru_block) { requiredSet.lru_states[i]++; }
 			}	
@@ -260,7 +264,7 @@ uint32_t readWordFromDataCache(uint32_t addr) {
 }
 
 int instructionMemory(uint32_t address, struct IF_ID_buffer *out) {
-	out->instruction = instruction_memory[address - 0x400000];
+	out->instruction = instruction_memory[(address - 0x400000) / 4];
 	// printf("Instruction got: %d\n", out->instruction);
 	return 0;
 }
