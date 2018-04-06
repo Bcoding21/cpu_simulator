@@ -41,7 +41,7 @@ int decode( struct IF_ID_buffer *in, struct ID_EX_buffer *out )
 	cpu_ctx.interrupt = false;
 }
 
-	short shamt = (in->instruction >> 6) & 0x1F; // gets bits 10:6
+	uint32_t shamt = (in->instruction >> 6) & 0x1F; // gets bits 10:6
 
 	setControlSignals(opcode, funct); // set the control signals
     uint32_t RS_index = (in->instruction >> 21) & 0x1F; // get bits 25:21 (rs)
@@ -54,7 +54,7 @@ int decode( struct IF_ID_buffer *in, struct ID_EX_buffer *out )
     jump_target_address = (in->pc_plus_4 & 0xF0000000 ) | jump_target_address;
 
     // set data outputs
-	out->read_data_1 = cpu_ctx.GPR[RS_index];     // RegisterFile[rs]
+	out->read_data_1 = cpu_ctx.GPR[opcode == 0x0 && funct == 0x0 ? RT_index: RS_index];     // RegisterFile[rs]
     out->read_data_2 = cpu_ctx.GPR[RT_index];     // RegisterFile[rt]
     //              if MSB(immediate field) == 0, then sign extend with leading 0s else sign extend with leading 1s
     out->immediate = (in->instruction & 0x8000) == 0 ? in->instruction & 0xFFFF : in->instruction & 0xFFFF0000; // 15:0  address
@@ -75,6 +75,7 @@ int decode( struct IF_ID_buffer *in, struct ID_EX_buffer *out )
     out->branch = cpu_ctx.CNTRL.branch;
     out->mem_to_reg = cpu_ctx.CNTRL.mem_to_reg;
     out->alu_source = cpu_ctx.CNTRL.alu_source;
+    out->jump = cpu_ctx.CNTRL.jump;
     out->reg_write = cpu_ctx.CNTRL.reg_write;
     out->jump_register = cpu_ctx.CNTRL.jump_register;
     out->jump_target_address = jump_target_address;
@@ -138,6 +139,9 @@ int memory( struct EX_MEM_buffer *in, struct MEM_WB_buffer *out )
 	uint32_t write_address = in->alu_result;
 	uint32_t write_data = in->read_data_2;
 	if (in->mem_write) {
+		printf("write_address hex: %x\n", write_address);
+		printf("offset: %x - %x = %x", write_address, 0x10000000,  write_address - 0x10000000);
+		printf("about to store word index: %d\n", (write_address - 0x10000000) / 4);
 		data_memory[(write_address - 0x10000000) / 4] = write_data;
 	}
 
@@ -152,7 +156,7 @@ int memory( struct EX_MEM_buffer *in, struct MEM_WB_buffer *out )
 	if (in->mem_read) {
 		out->mem_read_data = data_memory[write_address - 0x10000000];
 		#if defined(ENABLE_L1_CACHES)
-		printf("Using cache for memory read operation.\n");
+		printf("Using cache for memory operation.\n");
 		out->mem_read_data = readWordFromDataCache(write_address);
 		#endif
 	}
@@ -276,7 +280,7 @@ int alu(struct ALU_INPUT* alu_input, struct ALU_OUTPUT* out){
 		else if(alu_input->funct == 0x27)  { out->alu_result = ~(alu_input->input_1 | alu_input->input_2); }		//nor
 		else if(alu_input->funct == 0x25)  { out->alu_result = alu_input->input_1 | alu_input->input_2; }			//or
 		else if(alu_input->funct == 0x2A)  { out->alu_result = (alu_input->input_1 < alu_input->input_2) ? 1 : 0; }	//slt
-		else if (alu_input->funct == 0x00) {out->alu_result = alu_input->input_1 << alu_input->shamt;}              // sll
+		else if (alu_input->funct == 0x00) {out->alu_result = alu_input->input_1 << alu_input->shamt; printf("shifting %d left by %d: result:%d\n", alu_input->input_1,  alu_input->shamt, out->alu_result);}              // sll
 		else if (alu_input->funct == 0x02) {out->alu_result = alu_input->input_1 >> alu_input->shamt;}              // srl
         else if(alu_input->funct == 0x22)  { out->alu_result = alu_input->input_1 - alu_input->input_2; }           // sub
 
