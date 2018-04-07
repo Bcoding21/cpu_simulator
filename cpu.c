@@ -102,9 +102,7 @@ int execute( struct ID_EX_buffer *in, struct EX_MEM_buffer *out )
     //	use MUX to pick PC + 4 and 0 for jal instruction to be stored in $ra ($31).
     alu_input->input_1 = MULTIPLEXOR(in->jump, in->pc_plus_4, in->read_data_1);
     uint32_t alu_src_mux_output = MULTIPLEXOR(in->alu_source, in->immediate, in->read_data_2);
-    printf("immediate: %d| read_data_2: %d", in->immediate, in->read_data_2);
     alu_input->input_2 = MULTIPLEXOR(in->jump, 0, alu_src_mux_output);
-    printf("alu_input->input_2: %d", alu_input->input_2);
 
     // alu_input will take funct, opcode and shamt
     alu_input->funct = in->funct;
@@ -145,9 +143,7 @@ int memory( struct EX_MEM_buffer *in, struct MEM_WB_buffer *out )
 	}
 
 	//fake implementation of PCSrc signal and MUX
-	printf("Branch signal is %d", in->branch);
 	bool pc_src = in->branch && in->branch_result;
-	printf("in->branch && in->branch_result %d", in->branch && in->branch_result);
 	uint32_t pc_src_mux_output = MULTIPLEXOR(pc_src, in->branch_target, in->pc_plus_4);
 	uint32_t jump_mux_output = MULTIPLEXOR(in->jump, in->jump_target_address, pc_src_mux_output);
 	cpu_ctx.PC  = MULTIPLEXOR (in->jump_register, cpu_ctx.GPR[31], jump_mux_output);
@@ -176,9 +172,6 @@ int writeback( struct MEM_WB_buffer *in ){
 	}
 	in->write_reg_index = MULTIPLEXOR(in->jump, 31, in->write_reg_index);
 	if(in->reg_write) {
-		printf("in->mem_read_data: %d\n", in->mem_read_data);
-		printf("in->alu_result: %d\n", in->alu_result);
-		printf("writing value: %d to register", MULTIPLEXOR(in->mem_to_reg, in->mem_read_data, in->alu_result));
 		cpu_ctx.GPR[in->write_reg_index] = MULTIPLEXOR(in->mem_to_reg, in->mem_read_data, in->alu_result);
 	}
 	return 0;
@@ -190,23 +183,25 @@ int writeback( struct MEM_WB_buffer *in ){
 // it returns on ly the word at the requested address (addr) not the entire block
 uint32_t readWordFromDataCache(uint32_t addr) {
 	uint32_t block_addr = addr >> 4;		// block address = memory address / size of block (16)
-	uint32_t block_tag = addr >> 7;			// get most significant 25 bits of address for tag
+	uint32_t block_tag = addr >> 9;			// get most significant 25 bits of address for tag
 	int setIndex = block_addr % 32;			// get index for set
 	struct Set requiredSet = l1_data_cache[setIndex];	//obtain required set
-	int byte_offset = (addr - (block_addr << 4)) / 4;	//get byte offset for particular word
+	int word_offset = (addr - (block_addr << 4)) / 4;	//get byte offset for particular word
 	struct Block required_block;
 
-	int required_block_index;
 	bool found_and_valid = false;
+	printf("Block tag: %x\n", block_tag);
 	for (int i = 0; i < 4; i++) {
+		printf("tag %d: %x\n", i, requiredSet.block_array[i].tag);
 		if(requiredSet.block_array[i].tag == block_tag && requiredSet.block_array[i].valid) {
+			printf("a hit! a hit! we have a hit! getting block from cache and not memory.\n");
 			//handle read hit
 			required_block = requiredSet.block_array[i];
 			found_and_valid = true;
 
 			// update lru_states (only states less than former state of new mru need to be increased)
 			int former_lru_state = requiredSet.lru_states[i]; // this is the formaer LRU state of the block that's being read
-			requiredSet.lru_states[i] = 0;
+			l1_data_cache[setIndex].lru_states[i] = 0;
 			for (int j = 0; j < requiredSet.fill_extent; j++){
 				if (i != j && requiredSet.lru_states[j] < former_lru_state) { requiredSet.lru_states[j]++;		}
 			}
@@ -220,8 +215,10 @@ uint32_t readWordFromDataCache(uint32_t addr) {
 	//3. replace blocks that needs to be evicted
 	//4. update lru state
 	if(!found_and_valid) {
+		printf("we have a miss.\n");
 		//only do eviction if we have four blocks
 		if(requiredSet.fill_extent == 4 ) {
+			printf("Conflict miss.\n");
 			cpu_ctx.stall_count += 4; //need to increase stall count
 			int index_of_lru_block = 0;
 			for (int i = 0; i < 4; i++) {
@@ -238,12 +235,13 @@ uint32_t readWordFromDataCache(uint32_t addr) {
 			required_block.tag = block_tag;
 
 			//lru block will be replaced and so will become the MRU, so it'll have a state of 0
-			requiredSet.lru_states[index_of_lru_block] = 0;
-			requiredSet.block_array[index_of_lru_block] = required_block;
+			l1_data_cache[setIndex].lru_states[index_of_lru_block] = 0;
+			l1_data_cache[setIndex].block_array[index_of_lru_block] = required_block;
 			for (int i = 0; i < 4; i++) {
 				if (i != index_of_lru_block) { requiredSet.lru_states[i]++; }
 			}
 		} else {
+			printf("Compulsory miss.\n");
 			//handle compulsory misses (when miss occurs because set is not full)
 			int index_of_lru_block = 0;
 			for (int i = 0; i < requiredSet.fill_extent; i++) {
@@ -259,13 +257,13 @@ uint32_t readWordFromDataCache(uint32_t addr) {
 			required_block.data[3] = data_memory[raw_data_mem_array_index + 3];
 			required_block.valid = true;
 			required_block.tag = block_tag;
-			requiredSet.block_array[requiredSet.fill_extent - 1] = required_block;
+			l1_data_cache[setIndex].block_array[requiredSet.fill_extent - 1] = required_block;
 			for (int i = 0; i < requiredSet.fill_extent; i++) {
 				if (i != index_of_lru_block) { requiredSet.lru_states[i]++; }
 			}	
 		}
 	}
-	return required_block.data[byte_offset];
+	return required_block.data[word_offset];
 }
 
 int instructionMemory(uint32_t address, struct IF_ID_buffer *out) {
