@@ -37,9 +37,9 @@ int decode( struct IF_ID_buffer *in, struct ID_EX_buffer *out )
 	// TODO: move to setControlSignals
 	if (opcode == 0 && funct == 0xc && ((in->instruction & 0x3FFFFC0) == 0)) {  // check if it's a syscall
 		cpu_ctx.interrupt= true;
-} else {
-	cpu_ctx.interrupt = false;
-}
+	} else {
+		cpu_ctx.interrupt = false;
+	}
 
 	uint32_t shamt = (in->instruction >> 6) & 0x1F; // gets bits 10:6
 
@@ -102,7 +102,9 @@ int execute( struct ID_EX_buffer *in, struct EX_MEM_buffer *out )
     //	use MUX to pick PC + 4 and 0 for jal instruction to be stored in $ra ($31).
     alu_input->input_1 = MULTIPLEXOR(in->jump, in->pc_plus_4, in->read_data_1);
     uint32_t alu_src_mux_output = MULTIPLEXOR(in->alu_source, in->immediate, in->read_data_2);
+    printf("immediate: %d| read_data_2: %d", in->immediate, in->read_data_2);
     alu_input->input_2 = MULTIPLEXOR(in->jump, 0, alu_src_mux_output);
+    printf("alu_input->input_2: %d", alu_input->input_2);
 
     // alu_input will take funct, opcode and shamt
     alu_input->funct = in->funct;
@@ -139,14 +141,13 @@ int memory( struct EX_MEM_buffer *in, struct MEM_WB_buffer *out )
 	uint32_t write_address = in->alu_result;
 	uint32_t write_data = in->read_data_2;
 	if (in->mem_write) {
-		printf("write_address hex: %x\n", write_address);
-		printf("offset: %x - %x = %x", write_address, 0x10000000,  write_address - 0x10000000);
-		printf("about to store word index: %d\n", (write_address - 0x10000000) / 4);
 		data_memory[(write_address - 0x10000000) / 4] = write_data;
 	}
 
 	//fake implementation of PCSrc signal and MUX
+	printf("Branch signal is %d", in->branch);
 	bool pc_src = in->branch && in->branch_result;
+	printf("in->branch && in->branch_result %d", in->branch && in->branch_result);
 	uint32_t pc_src_mux_output = MULTIPLEXOR(pc_src, in->branch_target, in->pc_plus_4);
 	uint32_t jump_mux_output = MULTIPLEXOR(in->jump, in->jump_target_address, pc_src_mux_output);
 	cpu_ctx.PC  = MULTIPLEXOR (in->jump_register, cpu_ctx.GPR[31], jump_mux_output);
@@ -274,13 +275,14 @@ int instructionMemory(uint32_t address, struct IF_ID_buffer *out) {
 }
 
 int alu(struct ALU_INPUT* alu_input, struct ALU_OUTPUT* out){
+	printf("opcode: %d\n", alu_input->opcode);
 	if (alu_input->opcode == 0x00) { // R-format and syscall
 		if (alu_input->funct == 0x20) { out->alu_result = alu_input->input_1 + alu_input->input_2; }				//add
 		else if(alu_input->funct == 0x24)  { out->alu_result = alu_input->input_1 & alu_input->input_2; }			//and
 		else if(alu_input->funct == 0x27)  { out->alu_result = ~(alu_input->input_1 | alu_input->input_2); }		//nor
 		else if(alu_input->funct == 0x25)  { out->alu_result = alu_input->input_1 | alu_input->input_2; }			//or
 		else if(alu_input->funct == 0x2A)  { out->alu_result = (alu_input->input_1 < alu_input->input_2) ? 1 : 0; }	//slt
-		else if (alu_input->funct == 0x00) {out->alu_result = alu_input->input_1 << alu_input->shamt; printf("shifting %d left by %d: result:%d\n", alu_input->input_1,  alu_input->shamt, out->alu_result);}              // sll
+		else if (alu_input->funct == 0x00) {out->alu_result = alu_input->input_1 << alu_input->shamt;}              // sll
 		else if (alu_input->funct == 0x02) {out->alu_result = alu_input->input_1 >> alu_input->shamt;}              // srl
         else if(alu_input->funct == 0x22)  { out->alu_result = alu_input->input_1 - alu_input->input_2; }           // sub
 
@@ -308,7 +310,9 @@ int alu(struct ALU_INPUT* alu_input, struct ALU_OUTPUT* out){
         else if (alu_input->opcode == 0x0A )  { out->alu_result = (alu_input->input_1 < alu_input->input_2) ? 1 : 0; }	    // slti
         else if(alu_input->opcode == 0x0E)  { out->alu_result = alu_input->input_1 ^ alu_input->input_2; }                  // xori
 
-        else if (alu_input->opcode == 0x04) {out->branch_result = (alu_input->input_1 == alu_input->input_2) ? 1 : 0 ;}     // beq
+        else if (alu_input->opcode == 0x04) {
+        	out->branch_result = (alu_input->input_1 == alu_input->input_2) ? 1 : 0 ;
+        }     // beq
         else if (alu_input->opcode == 0x05) {out->branch_result = (alu_input->input_1 != alu_input->input_2) ? 1 : 0 ;}     // bne
 
         else if (alu_input->opcode == 0x23 ) {out->alu_result = alu_input->input_1 + alu_input->input_2;}                   // lw
@@ -374,6 +378,7 @@ int setControlSignals(short opcode, short funct) { // sets control signal output
 		if (opcode == 0x05 || opcode == 0x04) {
 			cpu_ctx.CNTRL.reg_write = false;
 			cpu_ctx.CNTRL.branch= true;
+			cpu_ctx.CNTRL.alu_source = false;
 			// reg_dst for beq and bne are falsely dont care
 		}
 					//		lw
