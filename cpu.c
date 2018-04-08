@@ -14,6 +14,7 @@
 #define BLOCKS_PER_SET 4
 #define BLOCK_SIZE 4 // words
 #define SET_SIZE 4
+#define BYTES_PER_WORD 4
 
 #include "cpu.h"
 #include "memory.h"
@@ -447,7 +448,7 @@ void writeDataCache(uint32_t address, uint32_t data) {
 
 	if (found) {
 		uint32_t offSet = address & ((1 << NUM_OFFSET_BITS) - 1);
-		uint32_t dataPos = offSet / (BLOCK_SIZE * 4);
+		uint32_t dataPos = offSet / BLOCK_SIZE;
 		found->data[dataPos] = data;
 
 		for (int i = 0; i < SET_SIZE; i++) { // increase lru states by 1
@@ -468,7 +469,7 @@ void writeDataCache(uint32_t address, uint32_t data) {
 		readBlock(set->block_array + blockPos, address, tag); // read from mem into cache
 
 		uint32_t offSet = address & ((1 << NUM_OFFSET_BITS) - 1);
-		uint32_t dataPos = offSet / (BLOCK_SIZE * 4);
+		uint32_t dataPos = offSet / BLOCK_SIZE;
 		set->block_array[blockPos].data[dataPos] = data;
 
 		for (int i = 0; i < SET_SIZE; i++) {
