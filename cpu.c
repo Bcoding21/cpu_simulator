@@ -8,6 +8,13 @@
  * Implementation of simulated processor.
  */
 
+#define NUM_INDEX_BITS 5
+#define NUM_OFFSET_BITS 4
+#define NUM_SETS 32
+#define BLOCKS_PER_SET 4
+#define BLOCK_SIZE 4 // words
+#define SET_SIZE 4
+
 #include "cpu.h"
 #include "memory.h"
 #include <stdlib.h>
@@ -18,6 +25,7 @@ int registerFile(struct REG_FILE_input* input, struct REG_FILE_output* output);
 int alu(struct ALU_INPUT* alu_input, struct ALU_OUTPUT* out);
 int setControlSignals(short opcode, short funct);
 uint32_t readWordFromDataCache(uint32_t addr);
+void writeDataCache(uint32_t, uint32_t);
 
 struct cpu_context cpu_ctx;
 struct Set l1_data_cache[32];
@@ -139,7 +147,7 @@ int memory( struct EX_MEM_buffer *in, struct MEM_WB_buffer *out )
 	uint32_t write_address = in->alu_result;
 	uint32_t write_data = in->read_data_2;
 	if (in->mem_write) {
-		data_memory[(write_address - 0x10000000) / 4] = write_data;
+		writeDataCache(write_address, write_data);
 	}
 
 	//fake implementation of PCSrc signal and MUX
@@ -409,4 +417,63 @@ uint32_t MULTIPLEXOR(bool selector, uint32_t HIGH_INPUT, uint32_t LOW_INPUT){
     }
 
     return result_val;
+}
+
+void readBlock(struct Block* block, uint32_t address, int tag) {
+	uint32_t memAddress = ((address << 4) - 0x10000000) / 4;
+	for (int i = 0; i < BLOCK_SIZE; i++) {
+		block->data[i] = data_memory[memAddress + i];
+	}
+	block->tag = tag;
+	block->valid = true;
+}
+
+
+void writeDataCache(uint32_t address, uint32_t data) {
+
+	uint32_t setIndex = address % NUM_SETS;
+	struct Set* set = l1_data_cache + setIndex;
+
+	struct Block* found = NULL;
+	int blockPos = 0;
+	uint32_t tag = address >> (NUM_OFFSET_BITS + NUM_INDEX_BITS);
+
+	for (int i = 0; i < BLOCKS_PER_SET; i++) { // find block in set
+		if (set->block_array[i].valid && set->block_array[i].tag == tag) {
+			found = set->block_array + i;
+			blockPos = i;
+		}
+	}
+
+	if (found) {
+		uint32_t offSet = address & ((1 << NUM_OFFSET_BITS) - 1);
+		uint32_t dataPos = offSet / (BLOCK_SIZE * 4);
+		found->data[dataPos] = data;
+
+		for (int i = 0; i < SET_SIZE; i++) { // increase lru states by 1
+			set->lru_states[i] += (set->lru_states[dataPos] > set->lru_states[i]);
+		}
+		set->lru_states[blockPos] = 0;
+	}
+
+	else {
+		int greatest = set->lru_states[0];
+		blockPos = 0;
+		for (int i = 0; i < SET_SIZE; i++) { // find lru block's index
+			if (set->lru_states[i] > greatest) {
+				blockPos = i;
+			}
+		}
+
+		readBlock(set->block_array + blockPos, address, tag); // read from mem into cache
+
+		uint32_t offSet = address & ((1 << NUM_OFFSET_BITS) - 1);
+		uint32_t dataPos = offSet / (BLOCK_SIZE * 4);
+		set->block_array[blockPos].data[dataPos] = data;
+
+		for (int i = 0; i < SET_SIZE; i++) {
+			set->lru_states[i]++;
+		}
+		set->lru_states[blockPos] = 0;
+	}
 }
