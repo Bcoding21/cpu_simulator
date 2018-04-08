@@ -476,7 +476,7 @@ void writeBack(struct Set* set, uint32_t blockPos, uint32_t theAddy, uint32_t da
 }
 
 /*Returns -1 if a miss occurs*/
-int containsTag(struct Set* set, uint32_t tag) {
+int getBlockPos(struct Set* set, uint32_t tag) {
 
 	for (int i = 0; i < BLOCKS_PER_SET; i++) { // find block in set
 		if (set->block_array[i].valid && set->block_array[i].tag == tag) {
@@ -492,7 +492,7 @@ void writeDataCache(uint32_t address, uint32_t data) {
 
 	uint32_t tag = address >> (NUM_OFFSET_BITS + NUM_INDEX_BITS);
 
-	int blockPos = containsTag(set, tag);
+	int blockPos = getBlockPos(set, tag);
 
 	if (blockPos != -1) {
 		writeBack(set, blockPos, address, data);
