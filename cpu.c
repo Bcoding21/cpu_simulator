@@ -410,7 +410,7 @@ uint32_t MULTIPLEXOR(bool selector, uint32_t HIGH_INPUT, uint32_t LOW_INPUT){
     // Function takes in 2 unsigned 32 bit value, if the selector is True we return the HIGH_INPUT
     // else we return the LOW_INPUT because the selector is definitely false.
 	uint32_t result_val;
-    if (selector){                  //
+    if (selector){                  
     	result_val = HIGH_INPUT;
     }
     else{
@@ -469,17 +469,19 @@ void writeBack(struct Set* set, uint32_t blockPos, uint32_t theAddy, uint32_t da
 	struct Block* block = set->block_array + blockPos;
 	block->data[dataPos] = data;
 
+	int* currBlockState = set->lru_states + blockPos; // block state of block being accessed.
 	for (int i = 0; i < SET_SIZE; i++) { // increase lru states by 1
-		set->lru_states[i] += (set->lru_states[dataPos] > set->lru_states[i]);
+		int* otherBlockState = set->lru_states + i;
+		*otherBlockState += (*currBlockState > *otherBlockState);
 	}
-	set->lru_states[blockPos] = 0;
+	*currBlockState = 0;
 }
 
 /*Returns -1 if a miss occurs*/
 int getBlockPos(struct Set* set, uint32_t tag) {
-
 	for (int i = 0; i < BLOCKS_PER_SET; i++) { // find block in set
-		if (set->block_array[i].valid && set->block_array[i].tag == tag) {
+		struct Block* currBlock = set->block_array + i;
+		if (currBlock->valid && currBlock->tag == tag) {
 			return i;
 		}
 	}
