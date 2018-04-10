@@ -463,7 +463,8 @@ void writeAllocate(struct Set* set, uint32_t address, uint32_t data) {
 	if (block->dirty) {
 		writeMem(block, data_memory);
 	}
-	block->dirty = block->valid == true;
+
+	block->dirty = block->valid;
 	readMem(block, address, data_memory); 
 	uint32_t dataPos = block->offset >> BLOCK_SIZE;
 	block->data[dataPos] = data;
