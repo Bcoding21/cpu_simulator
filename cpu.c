@@ -15,6 +15,7 @@
 #define BLOCK_SIZE 4 // words
 #define SET_SIZE 4
 #define BYTES_PER_WORD 4
+#define L1_DATA_START_ADDRESS 0x10000000
 
 #include "cpu.h"
 #include "memory.h"
@@ -424,9 +425,9 @@ uint32_t MULTIPLEXOR(bool selector, uint32_t HIGH_INPUT, uint32_t LOW_INPUT){
 
 /*read block into cache*/
 void readMem(struct Block* block, uint32_t address, uint32_t* memory) {
-	uint32_t memAddress = ((address << 4) - 0x10000000) / 4;
+	uint32_t pos = (address - L1_DATA_START_ADDRESS) / BLOCK_SIZE;
 	for (int i = 0; i < BLOCK_SIZE; i++) {
-		block->data[i] = memory[memAddress + i];
+		block->data[i] = memory[pos + i];
 	}
 	block->offset = address & ((1 << NUM_OFFSET_BITS) - 1);
 	block->index = address % 64;
@@ -435,17 +436,14 @@ void readMem(struct Block* block, uint32_t address, uint32_t* memory) {
 }
 
 /*write block to memory*/
-void writeMem(struct Block* block, uint32_t* memory) {
-	uint32_t address = block->offset | (block->index << NUM_OFFSET_BITS) |
-		(block->tag << NUM_INDEX_BITS + NUM_OFFSET_BITS);
-
-	uint32_t memAddress = ((address << 4) - 0x10000000) / 4;
+void writeMem(struct Block* block, uint32_t address) {
+	uint32_t pos = (address - L1_DATA_START_ADDRESS) / BLOCK_SIZE;
 	for (int i = 0; i < BLOCK_SIZE; i++) {
-		memory[memAddress + i] = block->data[i];
+		data_memory[pos + i] = block->data[i];
 	}
 }
 
-/*Handles write misses*/
+/*Write miss policy*/
 void writeAllocate(struct Set* set, uint32_t address, uint32_t data) {
 	/*determine block to be replaced*/
 	int greatest = set->lru_states[0];
@@ -456,28 +454,25 @@ void writeAllocate(struct Set* set, uint32_t address, uint32_t data) {
 		}
 	}
 
-	/* save data in memory if dirty.
-	Then replace block in cache with block from mem. */
+	/* save data in memory if dirty.*/
 	struct Block* block = set->block_array + blockPos;
 
 	if (block->dirty) {
-		writeMem(block, data_memory);
+		writeMem(block, address);
 	}
 
-	block->dirty = block->valid;
+	/*Then replace block in cache with block from mem.*/
 	readMem(block, address, data_memory); 
 	uint32_t dataPos = block->offset >> BLOCK_SIZE; // div by 4
 	block->data[dataPos] = data;
 
 	/*updates lru states*/
-	for (int i = 0; i < SET_SIZE; i++) {
-		set->lru_states[i]++;
-	}
+	for (int i = 0; i < SET_SIZE; i++) {set->lru_states[i]++;}
 	set->lru_states[blockPos] = 0;
 }
 
-/*Handles write hits*/
-void writeBack(struct Set* set, uint32_t blockPos, uint32_t theAddy, uint32_t data) {
+/*Wirte hit policy*/
+void writeBack(struct Set* set, uint32_t blockPos, uint32_t data) {
 
 	struct Block* block = set->block_array + blockPos;
 	/*write data*/
@@ -508,7 +503,9 @@ int getBlockPos(struct Set* set, uint32_t tag) {
 /*Writes data to cache using write back policy for hits
 and write allocate for misses*/
 void writeDataCache(uint32_t address, uint32_t data) {
-	uint32_t setIndex = address % NUM_SETS;
+
+	uint32_t blockAddress = address >> BLOCK_SIZE;
+	uint32_t setIndex = blockAddress % NUM_SETS;
 	struct Set* set = l1_data_cache + setIndex;
 
 	uint32_t tag = address >> (NUM_OFFSET_BITS + NUM_INDEX_BITS);
@@ -516,7 +513,7 @@ void writeDataCache(uint32_t address, uint32_t data) {
 	int blockPos = getBlockPos(set, tag);
 
 	if (blockPos != -1) {
-		writeBack(set, blockPos, address, data);
+		writeBack(set, blockPos, data);
 	}
 	else {
 		writeAllocate(set, address, data);
