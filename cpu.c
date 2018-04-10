@@ -422,38 +422,55 @@ uint32_t MULTIPLEXOR(bool selector, uint32_t HIGH_INPUT, uint32_t LOW_INPUT){
     return result_val;
 }
 
-/* Takes pointer to block in cache, 
-memory address, and tag, to set
-block in cache to whatever is in memory 
-*/
-void readBlock(struct Block* block, uint32_t address, int tag) {
+/*read block into cache*/
+void readMem(struct Block* block, uint32_t address, uint32_t* memory) {
 	uint32_t memAddress = ((address << 4) - 0x10000000) / 4;
 	for (int i = 0; i < BLOCK_SIZE; i++) {
-		block->data[i] = data_memory[memAddress + i];
+		block->data[i] = memory[memAddress + i];
 	}
-	block->tag = tag;
+	block->offset = address & ((1 << NUM_OFFSET_BITS) - 1);
+	block->index = address % 64;
+	block->tag = address >> (NUM_OFFSET_BITS + NUM_INDEX_BITS);
 	block->valid = true;
+}
+
+/*write block to memory*/
+void writeMem(struct Block* block, uint32_t* memory) {
+	uint32_t address = block->offset | (block->index << NUM_OFFSET_BITS) |
+		(block->tag << NUM_INDEX_BITS + NUM_OFFSET_BITS);
+
+	uint32_t memAddress = ((address << 4) - 0x10000000) / 4;
+	for (int i = 0; i < BLOCK_SIZE; i++) {
+		memory[memAddress + i] = block->data[i];
+	}
 }
 
 /*Handles write misses*/
 void writeAllocate(struct Set* set, uint32_t address, uint32_t data) {
+	/*determine block to be replaced*/
 	int greatest = set->lru_states[0];
 	int blockPos = 0;
-
-	for (int i = 0; i < SET_SIZE; i++) { // find lru block's index
+	for (int i = 0; i < SET_SIZE; i++) {
 		if (set->lru_states[i] > greatest) {
 			blockPos = i;
 		}
 	}
 
-	uint32_t tag = address >> (NUM_OFFSET_BITS + NUM_INDEX_BITS);
+	/* save data in memory if dirty.
+	Then replace block in cache with block from mem. */
+	struct Block* block = set->block_array + blockPos;
 
-	readBlock(set->block_array + blockPos, address, tag); // read from mem into cache
+	if (block->dirty) {
+		writeMem(block, data_memory);
+	}
 
-	uint32_t offSet = address & ((1 << NUM_OFFSET_BITS) - 1);
-	uint32_t dataPos = offSet / BLOCK_SIZE;
-	set->block_array[blockPos].data[dataPos] = data;
+	readMem(block, address, data_memory); 
+	uint32_t dataPos = block->offset >> BLOCK_SIZE;
+	block->data[dataPos] = data;
+	block->dirty = true;
+	
 
+	/*updates lru states*/
 	for (int i = 0; i < SET_SIZE; i++) {
 		set->lru_states[i]++;
 	}
@@ -463,13 +480,16 @@ void writeAllocate(struct Set* set, uint32_t address, uint32_t data) {
 /*Handles write hits*/
 void writeBack(struct Set* set, uint32_t blockPos, uint32_t theAddy, uint32_t data) {
 
+	struct Block* block = set->block_array + blockPos;
+	/*write data*/
 	uint32_t offSet = theAddy & ((1 << NUM_OFFSET_BITS) - 1);
 	uint32_t dataPos = offSet / BLOCK_SIZE;
-	struct Block* block = set->block_array + blockPos;
 	block->data[dataPos] = data;
+	block->dirty = true;
 
-	int* currBlockState = set->lru_states + blockPos; // lru state of block being accessed.
-	for (int i = 0; i < SET_SIZE; i++) { // increase lru states by 1
+	/*update lru states*/
+	int* currBlockState = set->lru_states + blockPos; 
+	for (int i = 0; i < SET_SIZE; i++) { 
 		int* otherBlockState = set->lru_states + i;
 		*otherBlockState += (*currBlockState < *otherBlockState);
 	}
@@ -487,6 +507,8 @@ int getBlockPos(struct Set* set, uint32_t tag) {
 	return -1;
 }
 
+/*Writes data to cache using write back policy for hits
+and write allocate for misses*/
 void writeDataCache(uint32_t address, uint32_t data) {
 	uint32_t setIndex = address % NUM_SETS;
 	struct Set* set = l1_data_cache + setIndex;

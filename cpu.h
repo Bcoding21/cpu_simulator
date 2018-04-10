@@ -46,9 +46,12 @@ struct cpu_context {
 // block is used to mean each row
 // the data field is the block content of each row
 struct Block {
-	uint32_t data[4];		//each block should contain 4 words
+	uint32_t data[4]; //each block should contain 4 words
+	int offset;
 	int tag;
+	int index;
 	bool valid;
+	bool dirty;
 };
 
 struct Set {
