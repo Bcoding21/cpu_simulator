@@ -466,7 +466,7 @@ void writeAllocate(struct Set* set, uint32_t address, uint32_t data) {
 
 	block->dirty = block->valid;
 	readMem(block, address, data_memory); 
-	uint32_t dataPos = block->offset >> BLOCK_SIZE;
+	uint32_t dataPos = block->offset >> BLOCK_SIZE; // div by 4
 	block->data[dataPos] = data;
 
 	/*updates lru states*/
@@ -481,8 +481,7 @@ void writeBack(struct Set* set, uint32_t blockPos, uint32_t theAddy, uint32_t da
 
 	struct Block* block = set->block_array + blockPos;
 	/*write data*/
-	uint32_t offSet = theAddy & ((1 << NUM_OFFSET_BITS) - 1);
-	uint32_t dataPos = offSet / BLOCK_SIZE;
+	uint32_t dataPos = block->offset >> BLOCK_SIZE; // div by 4
 	block->data[dataPos] = data;
 	block->dirty = true;
 
