@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "syscall.h"
+
 int instructionMemory(uint32_t address, struct IF_ID_buffer *out);
 int registerFile(struct REG_FILE_input* input, struct REG_FILE_output* output);
 int alu(struct ALU_INPUT* alu_input, struct ALU_OUTPUT* out);
@@ -190,6 +191,7 @@ int writeback( struct MEM_WB_buffer *in ){
 // det associative data memory cache is 
 // parameter addr is the address of the WORD (NOT BLOCK requested)
 // it returns on ly the word at the requested address (addr) not the entire block
+
 uint32_t readWordFromDataCache(uint32_t addr) {
 	uint32_t block_addr = addr >> 4;		// block address = memory address / size of block (16)
 	uint32_t block_tag = addr >> 9;			// get most significant 25 bits of address for tag
@@ -420,10 +422,9 @@ uint32_t MULTIPLEXOR(bool selector, uint32_t HIGH_INPUT, uint32_t LOW_INPUT){
     return result_val;
 }
 
-/*
-Takes pointer to block in cache, 
+/* Takes pointer to block in cache, 
 memory address, and tag, to set
-block in cache to whatever is in memory
+block in cache to whatever is in memory 
 */
 void readBlock(struct Block* block, uint32_t address, int tag) {
 	uint32_t memAddress = ((address << 4) - 0x10000000) / 4;
@@ -459,9 +460,7 @@ void writeAllocate(struct Set* set, uint32_t address, uint32_t data) {
 	set->lru_states[blockPos] = 0;
 }
 
-/*
-Handles write hits
-*/
+/*Handles write hits*/
 void writeBack(struct Set* set, uint32_t blockPos, uint32_t theAddy, uint32_t data) {
 
 	uint32_t offSet = theAddy & ((1 << NUM_OFFSET_BITS) - 1);
@@ -469,10 +468,10 @@ void writeBack(struct Set* set, uint32_t blockPos, uint32_t theAddy, uint32_t da
 	struct Block* block = set->block_array + blockPos;
 	block->data[dataPos] = data;
 
-	int* currBlockState = set->lru_states + blockPos; // block state of block being accessed.
+	int* currBlockState = set->lru_states + blockPos; // lru state of block being accessed.
 	for (int i = 0; i < SET_SIZE; i++) { // increase lru states by 1
 		int* otherBlockState = set->lru_states + i;
-		*otherBlockState += (*currBlockState > *otherBlockState);
+		*otherBlockState += (*currBlockState < *otherBlockState);
 	}
 	*currBlockState = 0;
 }
@@ -503,4 +502,3 @@ void writeDataCache(uint32_t address, uint32_t data) {
 		writeAllocate(set, address, data);
 	}
 }
-
