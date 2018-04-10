@@ -463,12 +463,10 @@ void writeAllocate(struct Set* set, uint32_t address, uint32_t data) {
 	if (block->dirty) {
 		writeMem(block, data_memory);
 	}
-
+	block->dirty = block->valid == true;
 	readMem(block, address, data_memory); 
 	uint32_t dataPos = block->offset >> BLOCK_SIZE;
 	block->data[dataPos] = data;
-	block->dirty = true;
-	
 
 	/*updates lru states*/
 	for (int i = 0; i < SET_SIZE; i++) {
