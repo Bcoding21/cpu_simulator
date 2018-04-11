@@ -456,9 +456,9 @@ void writeAllocate(struct Set* set, uint32_t address, uint32_t data) {
 		}
 	}
 
-	/* save data in memory if dirty.*/
 	struct Block* block = set->block_array + blockPos;
 
+	/*save data in memory if dirty.*/
 	if (block->dirty) {
 		writeMem(block, address);
 	}
@@ -478,7 +478,7 @@ void writeBack(struct Set* set, uint32_t blockPos, uint32_t data) {
 
 	struct Block* block = set->block_array + blockPos;
 	/*write data*/
-	uint32_t dataPos = block->offset >> BLOCK_SIZE; // div by 4
+	uint32_t dataPos = block->offset >> BLOCK_SIZE; 
 	block->data[dataPos] = data;
 	block->dirty = true;
 
@@ -507,17 +507,19 @@ and write allocate for misses*/
 void writeDataCache(uint32_t address, uint32_t data) {
 
 	uint32_t blockAddress = address >> BLOCK_SIZE;
-	uint32_t setIndex = blockAddress % NUM_SETS;
-	struct Set* set = l1_data_cache + setIndex;
+	uint32_t setOffset = blockAddress % NUM_SETS;
+	struct Set* set = l1_data_cache + setOffset;
 
 	uint32_t tag = address >> (NUM_OFFSET_BITS + NUM_INDEX_BITS);
 
 	int blockPos = getBlockPos(set, tag);
 
 	if (blockPos != -1) {
+		printf("D$ HIT! W");
 		writeBack(set, blockPos, data);
 	}
 	else {
+		printf("D$ MISS! W");
 		writeAllocate(set, address, data);
 	}
 }
