@@ -34,6 +34,11 @@ int main( int argc, char *argv[] )
 		cpu_ctx.GPR[i] = 0;
 		l1_data_cache[32].fill_extent = 0;
 	}
+    
+    for (i = 0; i < 128; i++){
+        // initializing valid bits to zero for instruction cache
+        L1_instruction_cache[i].valid = 0;
+    }
 
 	for ( i = 0; i < 1024; i++ ) {
 		instruction_memory[i] = 0;
@@ -41,15 +46,16 @@ int main( int argc, char *argv[] )
 		stack_memory[i] = 0;
 	}
 
-	const char* file = "example-text.txt";
+	const char* file = argv[1];
 	/* Read memory from the input file */
 	f = fopen(file, "r");
 	if (!f){
 		printf("File not found");
 	}
-	//assert (f);
+	assert (f);
 	for ( i = 0; i < 14; i++ ) {		//	only 12 instructions are read in because the programs we use to test only have 4 instruction. We'll switch to 1024 finally.
 		fread(instruction_memory + i, sizeof(uint32_t), 1, f);
+
 #if defined(DEBUG)
 		printf("i:%x\n", instruction_memory[i]);
 #endif
@@ -91,12 +97,15 @@ int main( int argc, char *argv[] )
 void showRegisterValues(int gpr[]) {
 	printf("GPR: [ ");
 	for(int i = 0; i < 32; i++) {
-		printf ("%d ", i);
+        printf ("%d : %d, ", i, gpr[i]);
 	}
+    
 	printf("]\n");
+    /*
 	printf("GPR: [ ");
 	for(int i = 0; i < 32; i++) {
 		printf ("%d ", gpr[i]);
 	}
 	printf("]\n");
+     */
 }
