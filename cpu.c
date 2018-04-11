@@ -513,9 +513,11 @@ void writeDataCache(uint32_t address, uint32_t data) {
 	int blockPos = getBlockPos(set, tag);
 
 	if (blockPos != -1) {
+		printf("$D Hit W");
 		writeBack(set, blockPos, data);
 	}
 	else {
+		printf("$D MISS W");
 		writeAllocate(set, address, data);
 	}
 }
