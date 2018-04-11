@@ -34,6 +34,11 @@ int main( int argc, char *argv[] )
 		cpu_ctx.GPR[i] = 0;
 		l1_data_cache[32].fill_extent = 0;
 	}
+    
+    for (i = 0; i < 128; i++){
+        // initializing valid bits to zero for instruction cache
+        L1_instruction_cache.valid = 0;
+    }
 
 	for ( i = 0; i < 1024; i++ ) {
 		instruction_memory[i] = 0;
@@ -91,12 +96,15 @@ int main( int argc, char *argv[] )
 void showRegisterValues(int gpr[]) {
 	printf("GPR: [ ");
 	for(int i = 0; i < 32; i++) {
-		printf ("%d ", i);
+        printf ("%d : %d ", i, gpr[i]);
 	}
+    
 	printf("]\n");
+    /*
 	printf("GPR: [ ");
 	for(int i = 0; i < 32; i++) {
 		printf ("%d ", gpr[i]);
 	}
 	printf("]\n");
+     */
 }

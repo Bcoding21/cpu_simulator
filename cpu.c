@@ -26,14 +26,20 @@ int registerFile(struct REG_FILE_input* input, struct REG_FILE_output* output);
 int alu(struct ALU_INPUT* alu_input, struct ALU_OUTPUT* out);
 int setControlSignals(short opcode, short funct);
 uint32_t readWordFromDataCache(uint32_t addr);
+uint32_t readWordFromInstructionCache(uint32_t addr);
 void writeDataCache(uint32_t, uint32_t);
 
 struct cpu_context cpu_ctx;
 struct Set l1_data_cache[32];
+struct Block L1_instruction_cache[128];
 
 int fetch(struct IF_ID_buffer *out )
 {
-	instructionMemory(cpu_ctx.PC, out);
+    #if defined(ENABLE_L1_CACHES)
+    printf("Using cache for IF operation.\n");
+    out->instruction = readWordFromInstructionCache(cpu_ctx.PC);
+    #endif
+	//instructionMemory(cpu_ctx.PC, out);
 	out->pc_plus_4 = cpu_ctx.PC + 4;
 	return 0;
 }
@@ -273,6 +279,37 @@ uint32_t readWordFromDataCache(uint32_t addr) {
 		}
 	}
 	return required_block.data[word_offset];
+}
+
+uint32_t readWordFromInstructionCache(uint32_t addr){
+    //Get cache index by modding address with number of blocks
+    int cache_index = addr % sizeof(L1_instruction_cache);
+    //Shift right two to get word to LSBs then mask it to isolate them
+    int word_offset = (addr >> 2) & 0x3;
+    int tag = addr >> 9;
+    
+    
+    Block curr_block = L1_instruction_cache[cache_index];
+    //Block not valid, must retrieve from memory then put it in the cache: compulsory miss
+    if (!curr_block.valid){
+        curr_block.tag = tag;
+        cpu_ctx.stall_count += 4; //need to increase stall count
+        curr_block.data[word_offset] = instruction_memory[(addr - 0x400000) / 4];
+        curr_block.valid = true;
+        printf("I$ Cold Miss.\n");
+    }
+    else if (curr_block.valid && curr_block.tag != tag){
+        // Conflict miss
+        cpu_ctx.stall_count += 4; //need to increase stall count
+        curr_block.tag = tag;
+        curr_block.data[word_offset] = instruction_memory[(addr - 0x400000) / 4];
+        printf("I$ Conflict Miss.\n");
+    }
+    else{
+        // Hit
+        printf("I$ Hit \n.");
+    }
+    return curr_block.data[word_offset];
 }
 
 int instructionMemory(uint32_t address, struct IF_ID_buffer *out) {
