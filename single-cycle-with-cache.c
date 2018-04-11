@@ -37,7 +37,7 @@ int main( int argc, char *argv[] )
     
     for (i = 0; i < 128; i++){
         // initializing valid bits to zero for instruction cache
-        L1_instruction_cache.valid = 0;
+        L1_instruction_cache[i].valid = 0;
     }
 
 	for ( i = 0; i < 1024; i++ ) {
@@ -53,7 +53,7 @@ int main( int argc, char *argv[] )
 		printf("File not found");
 	}
 	assert (f);
-	for ( i = 0; i < 14; i++ ) {		//	only 12 instructions are read in because the programs we use to test only have 4 instruction. We'll switch to 1024 finally.
+	for ( i = 0; i < 9; i++ ) {		//	only 12 instructions are read in because the programs we use to test only have 4 instruction. We'll switch to 1024 finally.
 		fread(&instruction_memory[i], sizeof(uint32_t), 1, f);
 #if defined(DEBUG)
 		printf("i:%x\n", instruction_memory[i]);
@@ -96,7 +96,7 @@ int main( int argc, char *argv[] )
 void showRegisterValues(int gpr[]) {
 	printf("GPR: [ ");
 	for(int i = 0; i < 32; i++) {
-        printf ("%d : %d ", i, gpr[i]);
+        printf ("%d : %d, ", i, gpr[i]);
 	}
     
 	printf("]\n");
