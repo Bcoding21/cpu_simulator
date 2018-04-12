@@ -37,11 +37,11 @@ struct Block L1_instruction_cache[128];
 
 int fetch(struct IF_ID_buffer *out )
 {
+    instructionMemory(cpu_ctx.PC, out);
     #if defined(ENABLE_L1_CACHES)
     printf("Using cache for IF operation.\n");
     out->instruction = readWordFromInstructionCache(cpu_ctx.PC);
     #endif
-	//instructionMemory(cpu_ctx.PC, out);
 	out->pc_plus_4 = cpu_ctx.PC + 4;
 	return 0;
 }
