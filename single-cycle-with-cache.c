@@ -98,6 +98,9 @@ void showRegisterValues(int gpr[]) {
 	printf("GPR: [ ");
 	for(int i = 0; i < 32; i++) {
         printf ("%d : %d, ", i, gpr[i]);
+        if (i % 10 == 0) {
+        	printf("\n");
+        }
 	}
     
 	printf("]\n");

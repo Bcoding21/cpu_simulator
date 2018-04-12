@@ -459,7 +459,7 @@ uint32_t MULTIPLEXOR(bool selector, uint32_t HIGH_INPUT, uint32_t LOW_INPUT){
 
 /*read block into cache*/
 void readMem(struct Block* block, uint32_t address, uint32_t* memory) {
-	uint32_t blockAddress = (address >> NUM_OFFSET_BITS) << NUM_OFFSET_BITS; // set last n bits to 0
+	uint32_t blockAddress = (address & 0xFFFFFFF0); // set last n bits to 0
 	uint32_t pos = (blockAddress - L1_DATA_START_ADDRESS) / BLOCK_SIZE;
 	for (int i = 0; i < BLOCK_SIZE; i++) {
 		block->data[i] = memory[pos + i];
