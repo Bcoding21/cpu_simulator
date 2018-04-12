@@ -154,7 +154,7 @@ struct ALU_OUTPUT {
 
 // Data Memory
 struct MEM_INPUT {
-	uint32_t address, write_data;
+	uint32_t blockAddress, write_data;
 	bool data_memory;
 };
 

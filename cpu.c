@@ -197,22 +197,19 @@ int writeback( struct MEM_WB_buffer *in ){
 // this function returns a block referred to by addr in the 
 // det associative data memory cache is 
 // parameter addr is the address of the WORD (NOT BLOCK requested)
-// it returns on ly the word at the requested address (addr) not the entire block
-
+// it returns only the word at the requested address (addr) not the entire block
 uint32_t readWordFromDataCache(uint32_t addr) {
-	uint32_t block_addr = addr >> 4;		// block address = memory address / size of block (16)
-	uint32_t block_tag = addr >> 9;			// get most significant 25 bits of address for tag
-	int setIndex = block_addr % 32;			// get index for set
+	uint32_t block_addr = addr >> NUM_OFFSET_BITS;		// block address = memory address / size of block (16)
+	uint32_t block_tag = addr >> (NUM_OFFSET_BITS + NUM_INDEX_BITS);			// get most significant 25 bits of address for tag
+	int setIndex = block_addr % NUM_SETS;			// get index for set
 	struct Set requiredSet = l1_data_cache[setIndex];	//obtain required set
-	int word_offset = (addr - (block_addr << 4)) / 4;	//get byte offset for particular word
+	int word_offset = (addr - (block_addr << NUM_OFFSET_BITS)) / 4;	//get byte offset for particular word
 	struct Block required_block;
 
 	bool found_and_valid = false;
-	printf("Block tag: %x\n", block_tag);
 	for (int i = 0; i < 4; i++) {
-		printf("tag %d: %x\n", i, requiredSet.block_array[i].tag);
 		if(requiredSet.block_array[i].tag == block_tag && requiredSet.block_array[i].valid) {
-			printf("a hit! a hit! we have a hit! getting block from cache and not memory.\n");
+			printf("We have a read hit in the data cache!.\n");
 			//handle read hit
 			required_block = requiredSet.block_array[i];
 			found_and_valid = true;
@@ -221,7 +218,7 @@ uint32_t readWordFromDataCache(uint32_t addr) {
 			int former_lru_state = requiredSet.lru_states[i]; // this is the formaer LRU state of the block that's being read
 			l1_data_cache[setIndex].lru_states[i] = 0;
 			for (int j = 0; j < requiredSet.fill_extent; j++){
-				if (i != j && requiredSet.lru_states[j] < former_lru_state) { requiredSet.lru_states[j]++;		}
+				if (i != j && requiredSet.lru_states[j] < former_lru_state) { requiredSet.lru_states[j]++;}
 			}
 		}
 	}
@@ -233,10 +230,10 @@ uint32_t readWordFromDataCache(uint32_t addr) {
 	//3. replace blocks that needs to be evicted
 	//4. update lru state
 	if(!found_and_valid) {
-		printf("we have a miss.\n");
+		//printf("we have a miss.\n");
 		//only do eviction if we have four blocks
 		if(requiredSet.fill_extent == 4 ) {
-			printf("Conflict miss.\n");
+			printf(" D$ Conflict miss R.\n");
 			cpu_ctx.stall_count += 4; //need to increase stall count
 			int index_of_lru_block = 0;
 			for (int i = 0; i < 4; i++) {
@@ -259,7 +256,7 @@ uint32_t readWordFromDataCache(uint32_t addr) {
 				if (i != index_of_lru_block) { requiredSet.lru_states[i]++; }
 			}
 		} else {
-			printf("Compulsory miss.\n");
+			printf("D$ Compulsory miss R.\n");
 			//handle compulsory misses (when miss occurs because set is not full)
 			int index_of_lru_block = 0;
 			for (int i = 0; i < requiredSet.fill_extent; i++) {
@@ -292,21 +289,21 @@ uint32_t readWordFromInstructionCache(uint32_t addr){
     int tag = addr >> 9;
     
     
-    Block curr_block = L1_instruction_cache[cache_index];
+    struct Block curr_block = L1_instruction_cache[cache_index];
     //Block not valid, must retrieve from memory then put it in the cache: compulsory miss
     if (!curr_block.valid){
         curr_block.tag = tag;
         cpu_ctx.stall_count += 4; //need to increase stall count
         curr_block.data[word_offset] = instruction_memory[(addr - 0x400000) / 4];
         curr_block.valid = true;
-        printf("I$ Cold Miss.\n");
+        printf("I$ Compulsory Miss R.\n");
     }
     else if (curr_block.valid && curr_block.tag != tag){
         // Conflict miss
         cpu_ctx.stall_count += 4; //need to increase stall count
         curr_block.tag = tag;
         curr_block.data[word_offset] = instruction_memory[(addr - 0x400000) / 4];
-        printf("I$ Conflict Miss.\n");
+        printf("I$ Conflict Miss R.\n");
     }
     else{
         // Hit
@@ -462,7 +459,7 @@ uint32_t MULTIPLEXOR(bool selector, uint32_t HIGH_INPUT, uint32_t LOW_INPUT){
 
 /*read block into cache*/
 void readMem(struct Block* block, uint32_t address, uint32_t* memory) {
-	uint32_t blockAddress = address & (1 << NUM_OFFSET_BITS); // set last n bits to 0
+	uint32_t blockAddress = (address & 0xFFFFFFF0); // set last n bits to 0
 	uint32_t pos = (blockAddress - L1_DATA_START_ADDRESS) / BLOCK_SIZE;
 	for (int i = 0; i < BLOCK_SIZE; i++) {
 		block->data[i] = memory[pos + i];
@@ -490,21 +487,23 @@ void writeAllocate(struct Set* set, uint32_t address, uint32_t data) {
 	for (int i = 0; i < SET_SIZE; i++) {
 		if (set->lru_states[i] > greatest) {
 			blockPos = i;
+			greatest = set->lru_states[i];
 		}
 	}
 
-	/* save data in memory if dirty.*/
 	struct Block* block = set->block_array + blockPos;
 
+	/*save data in memory if dirty.*/
 	if (block->dirty) {
 		writeMem(block, address);
 	}
 
 	/*Then replace block in cache with block from mem.*/
 	readMem(block, address, data_memory); 
-	uint32_t dataPos = block->offset >> BLOCK_SIZE; // div by 4
+	uint32_t dataPos = (address - (address & 0xFFFFFFF0)) / 4;
 	block->data[dataPos] = data;
-
+	set->block_array[blockPos] = *block;
+	
 	/*updates lru states*/
 	for (int i = 0; i < SET_SIZE; i++) {set->lru_states[i]++;}
 	set->lru_states[blockPos] = 0;
@@ -515,7 +514,7 @@ void writeBack(struct Set* set, uint32_t blockPos, uint32_t data) {
 
 	struct Block* block = set->block_array + blockPos;
 	/*write data*/
-	uint32_t dataPos = block->offset >> BLOCK_SIZE; // div by 4
+	uint32_t dataPos = block->offset >> BLOCK_SIZE; 
 	block->data[dataPos] = data;
 	block->dirty = true;
 
@@ -543,7 +542,7 @@ int getBlockPos(struct Set* set, uint32_t tag) {
 and write allocate for misses*/
 void writeDataCache(uint32_t address, uint32_t data) {
 
-	uint32_t blockAddress = address >> BLOCK_SIZE;
+	uint32_t blockAddress = address >> NUM_OFFSET_BITS;
 	uint32_t setIndex = blockAddress % NUM_SETS;
 	struct Set* set = l1_data_cache + setIndex;
 
@@ -552,9 +551,11 @@ void writeDataCache(uint32_t address, uint32_t data) {
 	int blockPos = getBlockPos(set, tag);
 
 	if (blockPos != -1) {
+		printf("D$ HIT! W");
 		writeBack(set, blockPos, data);
 	}
 	else {
+		printf("D$ MISS! W");
 		writeAllocate(set, address, data);
 	}
 }
