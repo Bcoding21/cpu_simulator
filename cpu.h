@@ -65,6 +65,8 @@ extern struct cpu_context cpu_ctx;
 
 // will change name to l1_data_cache
 extern struct Set l1_data_cache[32];
+//declaring struct for instruction cache
+extern struct Block L1_instruction_cache[128];
 
 struct IF_ID_buffer {
 	uint32_t instruction;
@@ -152,7 +154,7 @@ struct ALU_OUTPUT {
 
 // Data Memory
 struct MEM_INPUT {
-	uint32_t address, write_data;
+	uint32_t blockAddress, write_data;
 	bool data_memory;
 };
 
