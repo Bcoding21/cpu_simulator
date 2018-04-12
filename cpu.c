@@ -215,7 +215,7 @@ uint32_t readWordFromDataCache(uint32_t addr) {
 			int former_lru_state = requiredSet.lru_states[i]; // this is the formaer LRU state of the block that's being read
 			l1_data_cache[setIndex].lru_states[i] = 0;
 			for (int j = 0; j < requiredSet.fill_extent; j++){
-				if (i != j && requiredSet.lru_states[j] < former_lru_state) { requiredSet.lru_states[j]++;		}
+				if (i != j && requiredSet.lru_states[j] < former_lru_state) { requiredSet.lru_states[j]++;}
 			}
 		}
 	}
@@ -279,7 +279,9 @@ uint32_t readWordFromDataCache(uint32_t addr) {
 }
 
 int instructionMemory(uint32_t address, struct IF_ID_buffer *out) {
-	out->instruction = instruction_memory[(address - 0x400000) / 4];
+	uint32_t addressMinusStart = address - 0x400000;
+	uint32_t pos = (address - 0x400000) / 4;
+	out->instruction = instruction_memory[pos];
 	// printf("Instruction got: %d\n", out->instruction);
 	return 0;
 }
