@@ -19,6 +19,7 @@
 #define DEBUG
 
 void showRegisterValues();
+void showValues(uint32_t*, int size);
 int main( int argc, char *argv[] )
 {
 	FILE *f;
@@ -41,7 +42,7 @@ int main( int argc, char *argv[] )
 		stack_memory[i] = 0;
 	}
 
-    const char* file = argv[1];
+    const char* file = "C://Users//Brandon//Documents//School//Computer Organization II//Project 3//cache-project//util//test_1_simple_bne/program.sim";
 	/* Read memory from the input file */
 	f = fopen(file, "r");
 	if (!f){
@@ -55,12 +56,12 @@ int main( int argc, char *argv[] )
 #endif
 	}
 
-	for ( i = 0; i < 4; i++ ) {		//	only 4 words of data are read in because the programs we use to test only have 4 words of data. We'll switch to 1024 finally.
+	/*for ( i = 0; i < 4; i++ ) {		//	only 4 words of data are read in because the programs we use to test only have 4 words of data. We'll switch to 1024 finally.
 		fread(&data_memory[i], sizeof(uint32_t), 1, f);
 #if defined(DEBUG)
 		printf("d:%x\n", data_memory[i]);
 #endif
-	}
+	}*/
 	fclose(f);
 	int count = 0;
 
@@ -99,4 +100,11 @@ void showRegisterValues(int gpr[]) {
 		printf ("%d ", gpr[i]);
 	}
 	printf("]\n");
+}
+
+void showValues(uint32_t* list, int size) {
+	for (int i = 0; i < size; i++) {
+		printf("%d ", i);
+		printf("%d\n", list[i]);
+	}
 }
