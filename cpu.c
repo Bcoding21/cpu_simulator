@@ -121,11 +121,13 @@ int execute( struct ID_EX_buffer *in, struct EX_MEM_buffer *out )
     uint32_t alu_src_mux_output = MULTIPLEXOR(in->alu_source, in->immediate, in->read_data_2);
     alu_input->input_2 = MULTIPLEXOR(in->jump, 0, alu_src_mux_output);
 
+
     // alu_input will take funct, opcode and shamt
     alu_input->funct = in->funct;
     alu_input->opcode = in->opcode;
     alu_input->shamt = in->shamt;
     alu(alu_input, alu_output);
+
 
     // pass alu results
     out->alu_result = alu_output->alu_result;
@@ -459,13 +461,13 @@ uint32_t MULTIPLEXOR(bool selector, uint32_t HIGH_INPUT, uint32_t LOW_INPUT){
 
 /*read block into cache*/
 void readMem(struct Block* block, uint32_t address, uint32_t* memory) {
-	uint32_t blockAddress = (address & 0xFFFFFFF0); // set last n bits to 0
+	uint32_t blockAddress = (address & 0xFFFFFFF0); // set last byte to 0
 	uint32_t pos = (blockAddress - L1_DATA_START_ADDRESS) / BLOCK_SIZE;
 	for (int i = 0; i < BLOCK_SIZE; i++) {
 		block->data[i] = memory[pos + i];
 	}
 	block->offset = address & ((1 << NUM_OFFSET_BITS) - 1);
-	block->index = address % 64;
+	block->index = blockAddress % NUM_SETS;
 	block->tag = address >> (NUM_OFFSET_BITS + NUM_INDEX_BITS);
 	block->valid = true;
 }
@@ -500,9 +502,8 @@ void writeAllocate(struct Set* set, uint32_t address, uint32_t data) {
 
 	/*Then replace block in cache with block from mem.*/
 	readMem(block, address, data_memory); 
-	uint32_t dataPos = (address - (address & 0xFFFFFFF0)) / 4;
+	uint32_t dataPos = block->offset >> 2;
 	block->data[dataPos] = data;
-	set->block_array[blockPos] = *block;
 	
 	/*updates lru states*/
 	for (int i = 0; i < SET_SIZE; i++) {set->lru_states[i]++;}
@@ -514,7 +515,7 @@ void writeBack(struct Set* set, uint32_t blockPos, uint32_t data) {
 
 	struct Block* block = set->block_array + blockPos;
 	/*write data*/
-	uint32_t dataPos = block->offset >> BLOCK_SIZE; 
+	uint32_t dataPos = block->offset >> 2; // div by 4
 	block->data[dataPos] = data;
 	block->dirty = true;
 

@@ -61,12 +61,13 @@ int main( int argc, char *argv[] )
 #endif
 	}
 
-	/*for ( i = 0; i < 4; i++ ) {		//	only 4 words of data are read in because the programs we use to test only have 4 words of data. We'll switch to 1024 finally.
+	for (i = 0; i < 4; i++) {		//	only 4 words of data are read in because the programs we use to test only have 4 words of data. We'll switch to 1024 finally.
 		fread(&data_memory[i], sizeof(uint32_t), 1, f);
 #if defined(DEBUG)
 		printf("d:%x\n", data_memory[i]);
+	}
 #endif
-	}*/
+	
 	fclose(f);
 	int count = 0;
 
@@ -94,21 +95,21 @@ int main( int argc, char *argv[] )
 	return 0;
 }
 // This function displays the values in the GPR array. We use this for debugging purposes really.
-void showRegisterValues(int gpr[]) {
-	printf("GPR: [ ");
-	for(int i = 0; i < 32; i++) {
-        printf ("%d : %d, ", i, gpr[i]);
-        if (i % 10 == 0) {
-        	printf("\n");
-        }
+	void showRegisterValues(int gpr[]) {
+		printf("GPR: [ ");
+		for (int i = 0; i < 32; i++) {
+			printf("%d : %d, ", i, gpr[i]);
+			if (i % 10 == 0) {
+				printf("\n");
+			}
+		}
+
+		printf("]\n");
+
+		printf("GPR: [ ");
+		for (int i = 0; i < 32; i++) {
+			printf("%d ", gpr[i]);
+		}
+		printf("]\n");
+
 	}
-    
-	printf("]\n");
-    /*
-	printf("GPR: [ ");
-	for(int i = 0; i < 32; i++) {
-		printf ("%d ", gpr[i]);
-	}
-	printf("]\n");
-     */
-}
