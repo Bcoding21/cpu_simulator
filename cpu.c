@@ -43,6 +43,7 @@ int fetch(struct IF_ID_buffer *out )
     out->instruction = readWordFromInstructionCache(cpu_ctx.PC);
     #endif
 	out->pc_plus_4 = cpu_ctx.PC + 4;
+	cpu_ctx.PC += 4;
 	return 0;
 }
 
@@ -117,15 +118,23 @@ int execute( struct ID_EX_buffer *in, struct EX_MEM_buffer *out )
 
     // inputs
     //	use MUX to pick PC + 4 and 0 for jal instruction to be stored in $ra ($31).
+
+	if (in->read_data_1 == 0 && in->read_data_2 == 0) {
+		if (in->opcode == 0x2B) {
+			printf("Bad address");
+		}
+	}
     alu_input->input_1 = MULTIPLEXOR(in->jump, in->pc_plus_4, in->read_data_1);
     uint32_t alu_src_mux_output = MULTIPLEXOR(in->alu_source, in->immediate, in->read_data_2);
     alu_input->input_2 = MULTIPLEXOR(in->jump, 0, alu_src_mux_output);
+
 
     // alu_input will take funct, opcode and shamt
     alu_input->funct = in->funct;
     alu_input->opcode = in->opcode;
     alu_input->shamt = in->shamt;
     alu(alu_input, alu_output);
+
 
     // pass alu results
     out->alu_result = alu_output->alu_result;
@@ -163,7 +172,7 @@ int memory( struct EX_MEM_buffer *in, struct MEM_WB_buffer *out )
 	bool pc_src = in->branch && in->branch_result;
 	uint32_t pc_src_mux_output = MULTIPLEXOR(pc_src, in->branch_target, in->pc_plus_4);
 	uint32_t jump_mux_output = MULTIPLEXOR(in->jump, in->jump_target_address, pc_src_mux_output);
-	cpu_ctx.PC  = MULTIPLEXOR (in->jump_register, cpu_ctx.GPR[31], jump_mux_output);
+	//cpu_ctx.PC  = MULTIPLEXOR (in->jump_register, cpu_ctx.GPR[31], jump_mux_output);
 
 	//	pass necessary information to MEM/WB buffer
 	out->reg_write = in->reg_write;
@@ -313,9 +322,7 @@ uint32_t readWordFromInstructionCache(uint32_t addr){
 }
 
 int instructionMemory(uint32_t address, struct IF_ID_buffer *out) {
-	uint32_t addressMinusStart = address - 0x400000;
-	uint32_t pos = (address - 0x400000) / 4;
-	out->instruction = instruction_memory[pos];
+	out->instruction = instruction_memory[(address - 0x400000) / 4];
 	// printf("Instruction got: %d\n", out->instruction);
 	return 0;
 }
