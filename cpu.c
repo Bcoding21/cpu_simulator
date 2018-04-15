@@ -284,8 +284,9 @@ uint32_t readWordFromDataCache(uint32_t addr) {
 }
 
 uint32_t readWordFromInstructionCache(uint32_t addr){
+    int block_addr = addr / BLOCK_SIZE;
     //Get cache index by modding address with number of blocks
-    int cache_index = addr % sizeof(L1_instruction_cache);
+    int cache_index = block_addr % sizeof(L1_instruction_cache);
     //Shift right two to get word to LSBs then mask it to isolate them
     int word_offset = (addr >> 2) & 0x3;
     int tag = addr >> 9;
