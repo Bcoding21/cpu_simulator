@@ -284,12 +284,13 @@ uint32_t readWordFromDataCache(uint32_t addr) {
 }
 
 uint32_t readWordFromInstructionCache(uint32_t addr){
-    int block_addr = addr / BLOCK_SIZE;
+    //int block_addr = (addr >> 2) / 16;
     //Get cache index by modding address with number of blocks
-    int cache_index = block_addr % sizeof(L1_instruction_cache);
+    printf("Addr: %d , cpu_ctx.PC : %d \n", addr, cpu_ctx.PC);
+    int cache_index = (addr >> 4) & 0x7F;
     //Shift right two to get word to LSBs then mask it to isolate them
     int word_offset = (addr >> 2) & 0x3;
-    int tag = addr >> 9;
+    int tag = addr >> 11;
     
     
     struct Block curr_block = L1_instruction_cache[cache_index];
