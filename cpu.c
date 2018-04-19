@@ -298,7 +298,6 @@ uint32_t readWordFromInstructionCache(uint32_t addr){
     
     struct Block* curr_block = L1_instruction_cache + cache_index;
     printf("Block_tag: %d , addr_tag : %d \n", curr_block->tag, tag);
-    int mem_address = (addr - 0x400000);
 
     
     //Block not valid, must retrieve from memory then put it in the cache: compulsory miss
@@ -307,17 +306,18 @@ uint32_t readWordFromInstructionCache(uint32_t addr){
         cpu_ctx.stall_count += 4; //need to increase stall count
         curr_block->data[word_offset] = instruction_memory[(addr - 0x400000) / 4];
         curr_block->valid = true;
+        int mem_address = addr;
         for (int i = 0; i < 3; i++){
             int word_offset_next;
             mem_address += 4;
             block_addr = mem_address >> 4;
             cache_index = block_addr % 128;
             struct Block* next_block = L1_instruction_cache + cache_index;
-            word_offset_next = (addr >> 2) & 0x3;
-            next_block->data[word_offset] = instruction_memory[mem_address / 4];
+            word_offset_next = (mem_address >> 2) & 0x3;
+            next_block->data[word_offset_next] = instruction_memory[mem_address / 4];
             next_block->valid = true;
             printf("cache_index: %d , block_addr : %d \n", cache_index, block_addr);
-            printf("word_offset: %d ", word_offset);
+            printf("word_offset next: %d ", word_offset_next);
             printf("I$ data fetched: %d", next_block->data[word_offset_next]);
             printf("I$ Compulsory Miss R.\n");
 
