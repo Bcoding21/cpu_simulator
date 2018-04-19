@@ -314,6 +314,10 @@ uint32_t readWordFromInstructionCache(uint32_t addr){
             word_offset = (addr >> 2) & 0x3;
             curr_block->data[word_offset] = instruction_memory[mem_address / 4];
             curr_block->valid = true;
+            printf("cache_index: %d , block_addr : %d \n", cache_index, block_addr);
+            printf("word_offset: %d ", word_offset);
+            printf("I$ Compulsory Miss R.\n");
+
         }
         printf("I$ Compulsory Miss R.\n");
     }
@@ -326,6 +330,7 @@ uint32_t readWordFromInstructionCache(uint32_t addr){
     }
     else{
         // Hit
+        printf("I$ Hit: %d", curr_block->data[word_offset]);
         printf("I$ Hit \n.");
     }
     return curr_block->data[word_offset];
