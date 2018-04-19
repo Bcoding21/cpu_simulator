@@ -316,6 +316,7 @@ uint32_t readWordFromInstructionCache(uint32_t addr){
             curr_block->valid = true;
             printf("cache_index: %d , block_addr : %d \n", cache_index, block_addr);
             printf("word_offset: %d ", word_offset);
+            printf("I$ data fetched: %d", curr_block->data[word_offset]);
             printf("I$ Compulsory Miss R.\n");
 
         }
