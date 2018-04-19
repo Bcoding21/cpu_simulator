@@ -296,27 +296,28 @@ uint32_t readWordFromInstructionCache(uint32_t addr){
     printf("word_offset: %d ", word_offset);
     
     
-    struct Block curr_block = L1_instruction_cache[cache_index];
+    struct Block* curr_block = L1_instruction_cache + cache_index;
+    
     //Block not valid, must retrieve from memory then put it in the cache: compulsory miss
-    if (!curr_block.valid){
-        curr_block.tag = tag;
+    if (!curr_block->valid){
+        curr_block->tag = tag;
         cpu_ctx.stall_count += 4; //need to increase stall count
-        curr_block.data[word_offset] = instruction_memory[(addr - 0x400000) / 4];
-        curr_block.valid = true;
+        curr_block->data[word_offset] = instruction_memory[(addr - 0x400000) / 4];
+        curr_block->valid = true;
         printf("I$ Compulsory Miss R.\n");
     }
-    else if (curr_block.valid && curr_block.tag != tag){
+    else if (curr_block->valid && curr_block->tag != tag){
         // Conflict miss
         cpu_ctx.stall_count += 4; //need to increase stall count
-        curr_block.tag = tag;
-        curr_block.data[word_offset] = instruction_memory[(addr - 0x400000) / 4];
+        curr_block->tag = tag;
+        curr_block->data[word_offset] = instruction_memory[(addr - 0x400000) / 4];
         printf("I$ Conflict Miss R.\n");
     }
     else{
         // Hit
         printf("I$ Hit \n.");
     }
-    return curr_block.data[word_offset];
+    return curr_block->data[word_offset];
 }
 
 int instructionMemory(uint32_t address, struct IF_ID_buffer *out) {
