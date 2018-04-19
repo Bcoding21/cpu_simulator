@@ -294,9 +294,11 @@ uint32_t readWordFromInstructionCache(uint32_t addr){
     printf("Addr: %d , cpu_ctx.PC : %d \n", addr, cpu_ctx.PC);
     printf("cache_index: %d , block_addr : %d \n", cache_index, block_addr);
     printf("word_offset: %d ", word_offset);
-    
+    printf("Addr: %d , cpu_ctx.PC : %d \n", addr, cpu_ctx.PC);
     
     struct Block* curr_block = L1_instruction_cache + cache_index;
+    printf("Block_tag: %d , addr_tag : %d \n", curr_block->tag, tag);
+
     
     //Block not valid, must retrieve from memory then put it in the cache: compulsory miss
     if (!curr_block->valid){
