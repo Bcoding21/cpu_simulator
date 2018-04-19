@@ -308,7 +308,7 @@ uint32_t readWordFromInstructionCache(uint32_t addr){
         curr_block->valid = true;
         printf("I$ Compulsory Miss R.\n");
     }
-    else if (curr_block->valid && curr_block->tag != tag){
+    else if (curr_block->tag != tag || curr_block->data[word_offset] != instruction_memory[(addr - 0x400000) / 4] ){
         // Conflict miss
         cpu_ctx.stall_count += 4; //need to increase stall count
         curr_block->tag = tag;
@@ -316,8 +316,10 @@ uint32_t readWordFromInstructionCache(uint32_t addr){
         printf("I$ Conflict Miss R.\n");
     }
     else{
-        // Hit
-        printf("I$ Hit \n.");
+        if (curr_block->data[word_offset] == instruction_memory[(addr - 0x400000) / 4]){
+            // Hit
+            printf("I$ Hit \n.");
+        }
     }
     return curr_block->data[word_offset];
 }
