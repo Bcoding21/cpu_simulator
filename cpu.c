@@ -285,55 +285,35 @@ uint32_t readWordFromDataCache(uint32_t addr) {
 
 uint32_t readWordFromInstructionCache(uint32_t addr){
     int block_addr = addr >> 4;
-    int cache_index = block_addr % 128;
-    //Get cache index by modding address with number of blocks
-    //int cache_index = (addr >> 4) & 0x7F;
-    //Shift right two to get word to LSBs then mask it to isolate them
-    int word_offset = (addr >> 2) & 0x3;
-    int tag = addr >> 11;
-    printf("Addr: %d , cpu_ctx.PC : %d \n", addr, cpu_ctx.PC);
-    printf("cache_index: %d , block_addr : %d \n", cache_index, block_addr);
-    printf("word_offset: %d ", word_offset);
-    printf("Addr: %d , cpu_ctx.PC : %d \n", addr, cpu_ctx.PC);
+    int cache_index = block_addr % 128; //Get cache index by modding address with number of blocks
+    int word_offset = (addr >> 2) & 0x3; //Shift right two to get word to LSBs then mask it to isolate them
+	int tag = addr >> 11;
+	struct Block* curr_block = L1_instruction_cache + cache_index;
     
-    struct Block* curr_block = L1_instruction_cache + cache_index;
-    printf("Block_tag: %d , addr_tag : %d \n", curr_block->tag, tag);
-
-    
-    //Block not valid, must retrieve from memory then put it in the cache: compulsory miss
+    //Block not valid, must retrieve the 4 instructions with the same cache index from memory then put it in the cache: compulsory miss
+    // Effectively, fetch the 4 word block
     if (!curr_block->valid){
         curr_block->tag = tag;
         cpu_ctx.stall_count += 4; //need to increase stall count
-        curr_block->data[word_offset] = instruction_memory[(addr - 0x400000) / 4];
         curr_block->valid = true;
-        int mem_address = addr;
-        for (int i = 0; i < 3; i++){
-            int word_offset_next;
-            mem_address += 4;
-            block_addr = mem_address >> 4;
-            cache_index = block_addr % 128;
-            struct Block* next_block = L1_instruction_cache + cache_index;
-            word_offset_next = (mem_address >> 2) & 0x3;
-            next_block->data[word_offset_next] = instruction_memory[mem_address / 4];
-            next_block->valid = true;
-            printf("cache_index: %d , block_addr : %d \n", cache_index, block_addr);
-            printf("word_offset next: %d ", word_offset_next);
-            printf("I$ data fetched: %d", next_block->data[word_offset_next]);
-            printf("I$ Compulsory Miss R.\n");
-
+        uint32_t mem_addr = addr;  
+        for (int i = 0; i < 4; i++){
+            curr_block->data[i] = instruction_memory[((mem_addr + (i*4)) - 0x400000) / 4];
         }
         printf("I$ Compulsory Miss R.\n");
     }
     else if (curr_block->tag != tag){
-        // Conflict miss
+        // Conflict miss tag did not match. Load the block (4 instructions) with the associated tag.
         cpu_ctx.stall_count += 4; //need to increase stall count
         curr_block->tag = tag;
-        curr_block->data[word_offset] = instruction_memory[(addr - 0x400000) / 4];
+        uint32_t mem_addr = addr;  
+        for (int i = 0; i < 4; i++){
+            curr_block->data[i] = instruction_memory[((mem_addr + (i*4)) - 0x400000) / 4];
+        }
         printf("I$ Conflict Miss R.\n");
     }
     else{
         // Hit
-        printf("I$ Hit: %d", curr_block->data[word_offset]);
         printf("I$ Hit \n.");
     }
     return curr_block->data[word_offset];
