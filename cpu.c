@@ -368,8 +368,9 @@ int alu(struct ALU_INPUT* alu_input, struct ALU_OUTPUT* out){
         else if (alu_input->opcode == 0x05) {out->branch_result = (alu_input->input_1 != alu_input->input_2) ? 1 : 0 ;}     // bne
 
         else if (alu_input->opcode == 0x23 ) {out->alu_result = alu_input->input_1 + alu_input->input_2;}                   // lw
-        else if (alu_input->opcode == 0x2B ) {out->alu_result = alu_input->input_1 + alu_input->input_2;}                   // sw
-
+        else if (alu_input->opcode == 0x2B ) {out->alu_result = alu_input->input_1 + alu_input->input_2;}  
+	
+		// sw
     }
 
     return 0;
@@ -479,8 +480,8 @@ void readMem(struct Block* block, uint32_t address, uint32_t* memory) {
 }
 
 /*write block to memory*/
-void writeMem(struct Block* block, uint32_t address) {
-	uint32_t blockAddress = address & (1 << NUM_OFFSET_BITS); // set last n bits to 0
+void writeMem(struct Block* block) {
+	uint32_t blockAddress = block->tag & block->index & block->offset;
 	uint32_t pos = (blockAddress - L1_DATA_START_ADDRESS) / BLOCK_SIZE;
 	for (int i = 0; i < BLOCK_SIZE; i++) {
 		data_memory[pos + i] = block->data[i];
@@ -503,7 +504,7 @@ void writeAllocate(struct Set* set, uint32_t address, uint32_t data) {
 
 	/*save data in memory if dirty.*/
 	if (block->dirty) {
-		writeMem(block, address);
+		writeMem(block);
 	}
 
 	/*Then replace block in cache with block from mem.*/
@@ -529,7 +530,7 @@ void writeBack(struct Set* set, uint32_t blockPos, uint32_t data) {
 	int* currBlockState = set->lru_states + blockPos; 
 	for (int i = 0; i < SET_SIZE; i++) { 
 		int* otherBlockState = set->lru_states + i;
-		*otherBlockState += (*currBlockState < *otherBlockState);
+		*otherBlockState += (*currBlockState > *otherBlockState);
 	}
 	*currBlockState = 0;
 }
