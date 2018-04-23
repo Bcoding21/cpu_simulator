@@ -4,6 +4,7 @@
  * Daniel Erhabor
  * David Awogbemila
  * Brandon Cole
+ * Michaun Pierre
  * single-cycle.c
  * Drives the simulation of a single-cycle processor
  */

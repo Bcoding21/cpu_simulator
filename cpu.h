@@ -4,6 +4,7 @@
  * Daniel Erhabor
  * David Awogbemila
  * Brandon Cole
+ * Michaun Pierre
  * cpu.h
  * Definitions for the processor.
  */

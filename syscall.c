@@ -4,6 +4,7 @@
  * Daniel Erhabor
  * David Awogbemila
  * Brandon Cole
+ * Michaun Pierre
  * syscall.c
  * Implementation of the system calls
  */

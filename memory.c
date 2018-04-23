@@ -4,6 +4,7 @@
  * Daniel Erhabor
  * David Awogbemila
  * Brandon Cole
+ * Michaun Pierre
  * memory.c
  * Implementation of the memory.
  */
