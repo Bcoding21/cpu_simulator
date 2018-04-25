@@ -11,11 +11,11 @@
 
 
 ## Workload Distribution
-- Brandon - Implement data cache structure
-- Daniel - Implement instruction cache structure
-- David - write read logic - set associative
-- Michaun - write read logic - direct mapped
-- Temilola - write write logic - set-associative
+- Brandon - write write logic - set-associative
+- Daniel - Implement instruction cache structure, write read logic - direct mapped
+- David - Implement data cache structure, write read logic - set associative
+- Michaun - Implement instruction cache structure, write read logic - direct mapped
+- Temilola - testing
 
 ## Notes From Team Meetings
 ![Image](https://i.imgur.com/H6l7ekG.jpg)
